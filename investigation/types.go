@@ -107,6 +107,7 @@ type Event struct {
 	ResponseComplete *bool     `json:"response_complete,omitempty"`
 	FileName         string    `json:"file_name"`
 	Source           string    `json:"source"`
+	SourceAmbiguous  bool      `json:"source_ambiguous,omitempty"`
 	Line             int       `json:"line"`
 	Raw              string    `json:"raw"`
 }

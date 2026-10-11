@@ -47,7 +47,7 @@ func Analyze(plan Plan, scope Scope, c Collection) Analysis {
 			continue
 		}
 		pathRefs = append(pathRefs, e.Ref)
-		if e.EventKind == "alert" || e.EventKind == "경보" {
+		if e.EventKind == "alert" || e.EventKind == "경보" || e.SourceAmbiguous {
 			continue
 		}
 		identity := ""

@@ -106,7 +106,7 @@ func TestPurpleExecutionAPICollectExportAndSourceConflict(t *testing.T) {
 		if !strings.Contains(r.Form.Get("search"), execution.CorrelationID) {
 			t.Error("query lacks execution correlation")
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{"_time": eventTime.Format(time.RFC3339Nano), "verification_id": execution.CorrelationID, "action": "blocked", "_cd": "evidence-1"}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"preview": false, "lastrow": true, "result": map[string]any{"_time": eventTime.Format(time.RFC3339Nano), "verification_id": execution.CorrelationID, "action": "blocked", "_cd": "evidence-1"}})
 	}))
 	defer remote.Close()
 	sum := sha256.Sum256(remote.Certificate().Raw)

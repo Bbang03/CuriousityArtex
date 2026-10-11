@@ -39,14 +39,13 @@ func (p *investigationSplunkRunProvider) Complete(ctx context.Context, req llm.C
 	case 1:
 		tool, input = "plan_investigation", `{"action":"investigate","reason":"추가 원본 로그를 확인합니다.","hypothesis":"공개 파일에 대한 후속 접근이 있을 수 있습니다.","objective":"지정한 출발지의 후속 파일 요청을 확인합니다."}`
 	case 2:
-	case 3:
 		if p.beforeSearch != nil {
 			if err := p.beforeSearch(); err != nil {
 				return llm.Message{}, "", llm.Usage{}, err
 			}
 		}
 		tool, input = "search_evidence", `{"remote":true,"source_ip":"192.0.2.44","path_contains":"followup.txt"}`
-	case 4:
+	case 3:
 		if p.revoked {
 			tool, input = "record_observation", `{"kind":"insufficient_data","summary":"연결 설정 변경으로 후속 로그를 조회하지 못했습니다.","next_steps":["최신 연결로 로그 근거를 다시 준비하세요."]}`
 		} else {
@@ -64,7 +63,7 @@ func (p *investigationSplunkRunProvider) Complete(ctx context.Context, req llm.C
 			}
 			tool, input = "read_evidence", fmt.Sprintf(`{"refs":[%q]}`, p.ref)
 		}
-	case 5:
+	case 4:
 		if !p.revoked {
 			body, _ := json.Marshal(req.Messages)
 			if !strings.Contains(string(body), "original-remote-evidence-marker") {
@@ -72,17 +71,11 @@ func (p *investigationSplunkRunProvider) Complete(ctx context.Context, req llm.C
 			}
 			tool, input = "record_observation", fmt.Sprintf(`{"kind":"observed","summary":"지정한 출발지의 파일 요청이 기록되었습니다. 실제 내용 탈취 여부는 확인되지 않습니다.","evidence_refs":[%q],"alternatives":["승인된 정상 접근일 수 있습니다."],"next_steps":["인증 기록을 대조하세요."]}`, p.ref)
 		}
-	case 6:
+	case 5:
 		if p.revoked {
 			tool, input = "plan_investigation", `{"action":"insufficient_data","reason":"연결 변경으로 후속 로그 확인을 완료하지 못했습니다.","needed_logs":["최신 연결에서 다시 수집한 원본 로그"]}`
-		}
-	case 7:
-		if !p.revoked {
+		} else {
 			tool, input = "plan_investigation", fmt.Sprintf(`{"action":"complete","reason":"허용된 범위의 후속 접근을 원본으로 확인했습니다.","evidence_refs":[%q]}`, p.ref)
-		}
-	case 8:
-		if p.revoked {
-			return llm.Message{}, "", llm.Usage{}, fmt.Errorf("unexpected revoked-provider call")
 		}
 	default:
 		return llm.Message{}, "", llm.Usage{}, fmt.Errorf("unexpected provider call %d", n)
@@ -90,6 +83,15 @@ func (p *investigationSplunkRunProvider) Complete(ctx context.Context, req llm.C
 	usage := llm.Usage{InputTokens: 12, OutputTokens: 8}
 	if tool == "" {
 		return llm.Message{Role: llm.RoleAssistant, Content: []llm.ContentBlock{llm.TextBlock("단계를 마쳤습니다.")}}, "end_turn", usage, nil
+	}
+	// Assert the shortened sequence still crosses the real planner/worker
+	// boundary; a stale scripted response must not pass in the wrong stage.
+	available := false
+	for _, definition := range req.Tools {
+		available = available || definition.Name == tool
+	}
+	if !available {
+		return llm.Message{}, "", llm.Usage{}, fmt.Errorf("call %d expected %s in the current investigation stage", n, tool)
 	}
 	return llm.Message{Role: llm.RoleAssistant, Content: []llm.ContentBlock{{Type: llm.BlockToolUse, ID: fmt.Sprintf("remote-step-%d", n), Name: tool, Input: json.RawMessage(input)}}}, "tool_use", usage, nil
 }
@@ -242,7 +244,7 @@ func TestInvestigationRunSplunkCallbackEvidenceAndRevision(t *testing.T) {
 				}
 				return
 			}
-			if done.Status != "completed" || calls.Load() != 2 || len(proofs) != 1 || len(report.Observations) != 1 || report.Observations[0].Kind != "observed" || p.calls.Load() != 8 {
+			if done.Status != "completed" || calls.Load() != 2 || len(proofs) != 1 || len(report.Observations) != 1 || report.Observations[0].Kind != "observed" || p.calls.Load() != 5 {
 				t.Fatalf("server callback did not finish actual agent loop: status=%s calls=%d modelcalls=%d proofs=%d result=%s", done.Status, calls.Load(), p.calls.Load(), len(proofs), done.Result)
 			}
 			proof := proofs[0]

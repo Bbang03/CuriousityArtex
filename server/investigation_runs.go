@@ -215,7 +215,7 @@ func (s *Server) startInvestigationRun(w http.ResponseWriter, r *http.Request) {
 		if s.m.dir != "" {
 			transcripts = transcript.NewStore(filepath.Join(s.m.dir, "transcripts"))
 		}
-		opts := agent.InvestigatorOptions{Provider: provider, NonStreaming: !cfg.Stream, MaxTokens: cfg.MaxTokens, Transcript: transcripts, SessionID: fmt.Sprintf("cert-investigation-%d", run.ID), Finding: base.FindingSnapshot, Question: in.Question, Collection: base.Collection}
+		opts := agent.InvestigatorOptions{Provider: provider, NonStreaming: !cfg.Stream, MaxTokens: cfg.MaxTokens, Transcript: transcripts, SessionID: fmt.Sprintf("cert-investigation-%d", run.ID), Title: base.Title, Finding: base.FindingSnapshot, Question: in.Question, Collection: base.Collection}
 		if finding, e := s.m.pg.GetFinding(base.FindingID); e == nil && finding != nil && finding.TaskID != nil {
 			ctx = llmrec.WithTaskID(ctx, strconv.FormatInt(*finding.TaskID, 10))
 		}

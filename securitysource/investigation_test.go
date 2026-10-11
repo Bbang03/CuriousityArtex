@@ -132,12 +132,12 @@ func TestInvestigationSourcePreservesNativeNonJSONFieldsAndOrigins(t *testing.T)
 
 func TestInvestigationSourceConflictingMultivalueScopeIsNotSelected(t *testing.T) {
 	scope := historicalScope()
-	for _, field := range []string{"target", "path", "user", "source", "_time"} {
+	for _, field := range []string{"target", "path", "user", "host", "sourcetype", "index", "_time"} {
 		t.Run(field, func(t *testing.T) {
 			c, auth := sourceFixture(t, func(w http.ResponseWriter, r *http.Request) {
 				row := map[string]any{
 					"_time": scope.Start.Add(time.Hour).Format(time.RFC3339Nano), "id": "ambiguous",
-					"target": "juice-shop:3000", "path": "/ftp/a", "user": "alice", "source": "sensor-a",
+					"target": "juice-shop:3000", "path": "/ftp/a", "user": "alice", "source": "sensor-a", "host": "sensor-a", "sourcetype": "access", "index": "security",
 				}
 				row[field] = []any{row[field], "different-value"}
 				encoded, err := json.Marshal(row)

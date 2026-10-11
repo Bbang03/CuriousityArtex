@@ -216,7 +216,7 @@ func (s *Server) startDefensiveCaseRun(w http.ResponseWriter, r *http.Request) {
 		if s.m.dir != "" {
 			transcripts = transcript.NewStore(filepath.Join(s.m.dir, "transcripts"))
 		}
-		opts := agent.InvestigatorOptions{Provider: provider, NonStreaming: !cfg.Stream, MaxTokens: cfg.MaxTokens, Transcript: transcripts, SessionID: fmt.Sprintf("defensive-case-%d", run.ID), Question: in.Question, Collection: base.Collection}
+		opts := agent.InvestigatorOptions{Provider: provider, NonStreaming: !cfg.Stream, MaxTokens: cfg.MaxTokens, Transcript: transcripts, SessionID: fmt.Sprintf("defensive-case-%d", run.ID), Title: base.Title, Question: in.Question, Collection: base.Collection}
 		if base.FindingSnapshot != nil {
 			opts.Finding = *base.FindingSnapshot
 		}

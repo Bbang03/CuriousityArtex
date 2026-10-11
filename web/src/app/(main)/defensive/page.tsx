@@ -10,7 +10,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { FindingInvestigationAgentPanel } from "@/components/finding-investigation-agent-panel";
-import { InvestigationResult } from "@/components/finding-investigation-panel";
+import { InvestigationEvidenceNotice, InvestigationResult } from "@/components/finding-investigation-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import {
   type InvestigationMapping,
   type InvestigationPreview,
 } from "@/lib/investigation-api";
+import { investigationMappingForSource } from "@/lib/investigation-mapping";
 import { downloadSecurityJSON, type SecuritySource, securityApi } from "@/lib/security-api";
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -306,11 +307,7 @@ function DefensivePageContent() {
     setPreview(null);
     setCoverageConfirmed(false);
     setTargetScopeConfirmed(false);
-    setMapping(
-      next === "splunk"
-        ? { ...DEFAULT_INVESTIGATION_MAPPING, timestamp: "_time", event_id: "_cd", target: "host" }
-        : { ...DEFAULT_INVESTIGATION_MAPPING },
-    );
+    setMapping((current) => investigationMappingForSource(current, sourceKind, next));
   };
   const visibleCases = cases.filter((item) =>
     `${item.title} ${item.summary} ${item.scope.target}`.toLowerCase().includes(filter.toLowerCase()),
@@ -587,6 +584,7 @@ function DefensivePageContent() {
                     <p className="text-muted-foreground text-xs">{t("sourcetypesHelp")}</p>
                   </div>
                   <p className="text-muted-foreground text-xs leading-relaxed">{t("splunkHelp")}</p>
+                  <p className="text-sm leading-relaxed">{t("splunkTargetMappingHelp", { field: mapping.target })}</p>
                 </div>
               )}
               <details className="rounded-lg border p-4">
@@ -732,6 +730,7 @@ function DefensivePageContent() {
               <Badge variant="secondary">{ta("defensive.independent")}</Badge>
             )}
           </div>
+          <InvestigationEvidenceNotice record={record} />
           <FindingInvestigationAgentPanel
             key={record.id}
             findingId=""

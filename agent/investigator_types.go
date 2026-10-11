@@ -39,6 +39,7 @@ type InvestigatorOptions struct {
 	SessionID    string
 	Transcript   *transcript.Store
 	Finding      investigation.FindingContext
+	Title        string
 	Question     string
 	Collection   investigation.Collection
 	Search       func(context.Context, InvestigationSearch) (investigation.Collection, error)

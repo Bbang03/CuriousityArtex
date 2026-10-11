@@ -131,7 +131,7 @@ func TestInvestigationRunAPIAsyncHistoryExportAndNoRetest(t *testing.T) {
 		t.Fatal(err)
 	}
 	done := waitInvestigationRun(t, s, &run)
-	if done.Status != "insufficient_data" || done.Usage.ModelCalls != 2 || len(done.Events) < 2 || !strings.Contains(string(done.Result), "인증 로그") {
+	if done.Status != "insufficient_data" || done.Usage.ModelCalls != 1 || len(done.Events) < 2 || !strings.Contains(string(done.Result), "인증 로그") {
 		t.Fatalf("unexpected finished run: %+v", done)
 	}
 	w = request("GET", fmt.Sprintf("%s/%d/export", path, done.ID), "")

@@ -231,6 +231,51 @@ func TestCSVAndSplunkRawFallback(t *testing.T) {
 		t.Fatal(e, c)
 	}
 }
+
+func TestSourceMetadataCollisionPreservesEvidenceWithoutJoiningOrigins(t *testing.T) {
+	rows := []string{}
+	for i, path := range []string{"/ftp/a", "/ftp/b", "/ftp/c"} {
+		rows = append(rows, row(fmt.Sprint(i), path, map[string]any{
+			"source": []string{"modsecurity-native", "modsecurity-native-audit"},
+			"host":   "sensor-a", "sourcetype": "waf:audit",
+		}))
+	}
+	c := parse(t, strings.Join(rows, "\n"))
+	if len(c.Events) != 3 || c.Stats.InvalidEvents != 0 || c.Complete {
+		t.Fatalf("ambiguous provenance lost evidence or claimed completeness: %+v", c.Stats)
+	}
+	for _, e := range c.Events {
+		if !e.SourceAmbiguous || !strings.Contains(e.Raw, `"modsecurity-native-audit"`) {
+			t.Fatal("source conflict or original evidence lost")
+		}
+	}
+	if c.Events[0].Source == c.Events[1].Source || len(Analyze(plan(), testScope(), c).Signals) != 0 {
+		t.Fatal("ambiguous source was used to join independent events")
+	}
+	warnings := 0
+	for _, warning := range c.Warnings {
+		if strings.Contains(warning, "서로 다른 출처") {
+			warnings++
+		}
+	}
+	if warnings != 1 {
+		t.Fatal("source conflicts should produce one collection warning")
+	}
+}
+
+func TestSourceMetadataDuplicatesAndMalformedValues(t *testing.T) {
+	plain := parse(t, row("same", "/ftp/a", map[string]any{"source": "sensor-a"}))
+	duplicate := parse(t, row("same", "/ftp/a", map[string]any{"source": []string{"sensor-a", "sensor-a"}}))
+	if !duplicate.Complete || len(duplicate.Events) != 1 || duplicate.Events[0].SourceAmbiguous || duplicate.Events[0].Source != plain.Events[0].Source {
+		t.Fatal("equal source duplicates changed source identity")
+	}
+	for _, value := range []any{[]any{}, []any{"sensor-a", 7}, map[string]any{"name": "sensor-a"}} {
+		c := parse(t, row("invalid", "/ftp/a", map[string]any{"source": value}))
+		if c.Complete || len(c.Events) != 0 || c.Stats.InvalidEvents != 1 {
+			t.Fatal("malformed provenance accepted")
+		}
+	}
+}
 func TestDottedLiteralKeyPrecedence(t *testing.T) {
 	m := DefaultMapping()
 	m.Path = "http.path"

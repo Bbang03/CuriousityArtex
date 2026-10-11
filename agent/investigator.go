@@ -25,23 +25,26 @@ const investigatorRules = `당신은 ARTEX의 과거 로그 침해 조사 에이
 허용된 대상·시간·경로에서 읽기 전용 로그 조사만 합니다. 제공된 전용 도구 외에 명령 실행, 웹 접속, 공격, 설정 변경, 일반 ARTEX 도구는 없습니다.
 observed는 로그에 직접 기록된 행동에 대한 AI 해석입니다. 도구가 인용 존재를 검증하더라도 의미나 침해 성공을 확정하지 않습니다. inferred는 연결 가설이며 반증·정상 대안을 명시합니다. HTTP 200, 동일 IP, 경보 미탐지나 로그 부재만으로 탈취·동일 공격자·안전을 판정하지 마세요.
 known_artex 이벤트는 ARTEX 재현 트래픽이므로 실제 침해 증거와 구분하세요. 원본 이벤트에서 읽지 않은 사실이나 ref를 만들지 마세요. 파일에 없는 로그는 조회할 수 없습니다. 인증·호스트·유출 로그가 없거나 범위 밖이면 필요한 로그와 추가 조사 범위를 남기고 멈추세요.
+source_ambiguous=true는 원본 출처 필드가 모호하다는 뜻입니다. 해당 이벤트들을 같은 로그 출처의 연속 행동이라고 연결하지 말고 출처 확인이 필요함을 남기세요.
 정규화 필드·bounded raw excerpt만 제공되며 누락·절단·수집 범위 경고를 존중해야 합니다. 대량으로 같은 조회를 반복하지 마세요. 완료는 조사 작업의 완료이며 침해 여부의 확정이 아닙니다.`
 
 type investigatorRun struct {
-	mu            sync.Mutex
-	opts          InvestigatorOptions
-	report        InvestigatorReport
-	provider      *investigatorProvider
-	events        map[string]investigation.Event
-	seen          map[string]bool
-	rawSeen       map[string]bool
-	stage         string
-	round         int
-	intentID      string
-	decision      *investigatorPlanInput
-	remoteQueries int
-	evidenceBytes int
-	queryKeys     map[string]bool
+	mu                 sync.Mutex
+	opts               InvestigatorOptions
+	report             InvestigatorReport
+	provider           *investigatorProvider
+	events             map[string]investigation.Event
+	seen               map[string]bool
+	rawSeen            map[string]bool
+	stage              string
+	round              int
+	intentID           string
+	decision           *investigatorPlanInput
+	remoteQueries      int
+	evidenceBytes      int
+	queryKeys          map[string]bool
+	queryTotals        map[string]int
+	emptyCompleteScope bool
 }
 
 func investigatorBudget(b InvestigatorBudget) InvestigatorBudget {
@@ -62,12 +65,14 @@ func investigatorBudget(b InvestigatorBudget) InvestigatorBudget {
 // constructed, registered, augmented, or made available in these sessions.
 func RunInvestigation(ctx context.Context, opts InvestigatorOptions) (InvestigatorReport, error) {
 	b := investigatorBudget(opts.Budget)
-	r := &investigatorRun{opts: opts, events: map[string]investigation.Event{}, seen: map[string]bool{}, rawSeen: map[string]bool{}, queryKeys: map[string]bool{}, report: InvestigatorReport{Version: InvestigatorVersion, Status: "running", StartedAt: time.Now().UTC(), Scope: opts.Collection.Scope, Budget: b}}
+	r := &investigatorRun{opts: opts, events: map[string]investigation.Event{}, seen: map[string]bool{}, rawSeen: map[string]bool{}, queryKeys: map[string]bool{}, queryTotals: map[string]int{}, report: InvestigatorReport{Version: InvestigatorVersion, Status: "running", StartedAt: time.Now().UTC(), Scope: opts.Collection.Scope, Budget: b}}
 	finish := func(status, summary string, err error) (InvestigatorReport, error) {
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		r.report.Status = status
-		r.report.Summary = summary
+		r.report.Gaps = certUniqueStrings(r.report.Gaps)
+		r.report.NextSteps = certUniqueStrings(r.report.NextSteps)
+		r.report.Summary = r.resultSummary(status, summary)
 		r.report.FinishedAt = time.Now().UTC()
 		for i := range r.report.Intents {
 			if r.report.Intents[i].State == "running" {
@@ -77,7 +82,7 @@ func RunInvestigation(ctx context.Context, opts InvestigatorOptions) (Investigat
 		if r.provider != nil {
 			r.report.Usage = r.provider.snapshot()
 		}
-		r.emitLocked(InvestigatorProgress{Stage: "runtime", Kind: "finished", Summary: summary, IsError: err != nil})
+		r.emitLocked(InvestigatorProgress{Stage: "runtime", Kind: "finished", Summary: r.report.Summary, IsError: err != nil})
 		return r.report, err
 	}
 	if opts.Provider == nil {
@@ -109,12 +114,21 @@ func RunInvestigation(ctx context.Context, opts InvestigatorOptions) (Investigat
 	if r.provider.maxOutput <= 0 || r.provider.maxOutput > 2048 {
 		r.provider.maxOutput = 2048
 	}
+	if len(r.events) == 0 && opts.Search == nil {
+		r.report.NextSteps = append(r.report.NextSteps, "대상·기간·원본 필드 매핑을 확인하고 실제 이벤트가 포함된 근거를 다시 준비하세요.")
+		return finish("insufficient_data", "저장된 범위에 조사할 이벤트가 없고 추가 로그 연결도 없습니다.", nil)
+	}
 	for round := 1; round <= b.MaxRounds; round++ {
+		if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < 20*time.Second {
+			return finish("budget_exhausted", "남은 시간에는 추가 조사를 완료하기 어려워 저장된 결과를 정리했습니다.", nil)
+		}
 		r.round = round
 		r.stage = "planner"
 		r.decision = nil
 		r.emit(InvestigatorProgress{Kind: "stage", Summary: "증거를 바탕으로 조사 계획을 검토합니다."})
-		_, reason, err := r.runSession(ctx, "planner", 2, []actool.CoreTool{r.planTool()}, r.plannerInput())
+		// The validated plan tool is the planner's final output. Do not spend a
+		// second model call asking it to narrate the already persisted decision.
+		_, reason, err := r.runSession(ctx, "planner", 1, []actool.CoreTool{r.planTool()}, r.plannerInput())
 		if status, msg, stop := r.terminal(ctx, reason, err); stop {
 			return finish(status, msg, err)
 		}
@@ -131,15 +145,19 @@ func RunInvestigation(ctx context.Context, opts InvestigatorOptions) (Investigat
 		r.report.Intents = append(r.report.Intents, intent)
 		r.emit(InvestigatorProgress{Kind: "intent", Summary: intent.Objective, Intent: &intent, EvidenceRefs: intent.EvidenceRefs})
 		before := len(r.report.Observations)
-		input, _ := json.Marshal(map[string]any{"intent": intent, "scope": r.report.Scope, "available_events": len(r.events), "remote_search_available": opts.Search != nil, "collection_warnings": opts.Collection.Warnings, "instructions": "search_evidence로 조사한 뒤 read_evidence로 핵심 원문을 확인하고 record_observation으로 근거 및 대안을 기록하세요. 자료 부족도 기록하세요. 후속 계획은 planner가 합니다."})
-		_, reason, err = r.runSession(ctx, "worker", 4, []actool.CoreTool{r.searchTool(), r.readTool(), r.observationTool()}, string(input))
+		input := r.workerInput(ctx, intent)
+		_, reason, err = r.runSession(ctx, "worker", 3, []actool.CoreTool{r.searchTool(), r.readTool(), r.observationTool()}, input)
 		if status, msg, stop := r.terminal(ctx, reason, err); stop {
 			return finish(status, msg, err)
+		}
+		if r.emptyCompleteScope && len(r.events) == 0 {
+			r.report.NextSteps = append(r.report.NextSteps, "전체 조사 범위의 조회가 0건입니다. 대상 필드 매핑·sourcetype·수집 상태를 확인한 뒤 새 근거를 준비하세요.")
+			return finish("insufficient_data", "저장된 근거와 범위 전체의 추가 조회에서 조사할 이벤트를 찾지 못했습니다.", nil)
 		}
 		state := "completed"
 		if len(r.report.Observations) == before {
 			state = "insufficient_data"
-			r.report.Gaps = append(r.report.Gaps, fmt.Sprintf("%s: 근거를 갖춘 관측 결과가 기록되지 않았습니다.", intent.Objective))
+			r.report.Gaps = certUniqueStrings(append(r.report.Gaps, fmt.Sprintf("%s: 근거를 갖춘 관측 결과가 기록되지 않았습니다.", intent.Objective)))
 		}
 		r.report.Intents[len(r.report.Intents)-1].State = state
 		intent = r.report.Intents[len(r.report.Intents)-1]
@@ -193,7 +211,7 @@ func (r *investigatorRun) plannerInput() string {
 	f.Evidence = certClip(f.Evidence, 3000)
 	f.VulnClass = certClip(f.VulnClass, 200)
 	f.Assets = nil
-	in := map[string]any{"finding_data": f, "question": certClip(r.opts.Question, 2000), "scope": r.report.Scope, "round": r.round, "remaining_rounds": r.report.Budget.MaxRounds - r.round + 1, "events_available": len(r.events), "remote_search_available": r.opts.Search != nil, "intents": r.report.Intents, "observations": r.report.Observations, "collection_gaps": r.report.Gaps, "instructions": "plan_investigation을 정확히 한 번 호출하세요. 처음에는 실제 로그를 확인할 구체적 가설과 작업 하나를 제시하세요. 후속 회차에는 기록된 증거·부족 자료를 읽고 다음 조사 또는 중단을 결정하세요. 이전에 조사한 작업을 반복하지 마세요. complete는 조사 작업 완료이며 침해 확정이 아닙니다. 자료가 부족하면 action=insufficient_data, needed_logs와 next_steps를 남기세요."}
+	in := map[string]any{"finding_data": f, "case_title": certClip(r.opts.Title, 300), "question": certClip(r.opts.Question, 2000), "scope": r.report.Scope, "evidence_inventory": r.evidenceInventory(), "round": r.round, "remaining_rounds": r.report.Budget.MaxRounds - r.round + 1, "events_available": len(r.events), "remote_search_available": r.opts.Search != nil, "intents": r.report.Intents, "observations": r.report.Observations, "collection_gaps": certUniqueStrings(r.report.Gaps), "instructions": "plan_investigation을 정확히 한 번 호출하고 종료하세요. evidence_inventory는 이미 저장된 실제 로그의 집계입니다. 원문을 아직 읽지 않았다는 이유로 로그가 없다고 판단하지 마세요. case_title과 question, 실제 경로·event_kind·action 분포로 구체적 작업 하나만 계획하세요. 정상/ARTEX 활동과 의심 행동을 구분하며 광범위한 침해 성공 가설을 먼저 단정하지 마세요. SPL이나 존재를 확인하지 않은 필드명을 만들어 제안하지 마세요. 후속 회차는 기존 관측을 바탕으로 필요한 작업만 하며, 충분하면 complete, 자료 부족이면 insufficient_data와 필요한 로그를 남기세요."}
 	b, _ := json.Marshal(in)
 	return string(b)
 }

@@ -98,8 +98,8 @@ func (r *investigatorRun) planTool() actool.CoreTool {
 		r.decision = &a
 		d := InvestigatorDecision{Round: r.round, Action: a.Action, Reason: a.Reason, EvidenceRefs: a.EvidenceRefs}
 		r.report.Decisions = append(r.report.Decisions, d)
-		r.report.Gaps = append(r.report.Gaps, a.NeededLogs...)
-		r.report.NextSteps = append(r.report.NextSteps, a.NextSteps...)
+		r.report.Gaps = certUniqueStrings(append(r.report.Gaps, a.NeededLogs...))
+		r.report.NextSteps = certUniqueStrings(append(r.report.NextSteps, a.NextSteps...))
 		r.emitLocked(InvestigatorProgress{Kind: "decision", Summary: a.Reason, Decision: &d, EvidenceRefs: a.EvidenceRefs})
 		return jsonResult(map[string]any{"saved": true, "action": a.Action, "instruction": "이번 회차의 계획이 저장되었습니다. 간단히 종료하세요. 호스트가 작업자를 실행합니다."})
 	})
@@ -158,6 +158,32 @@ func (r *investigatorRun) searchTool() actool.CoreTool {
 			return actool.Errorf("조사가 종료되었습니다"), nil
 		}
 		r.mu.Lock()
+		if r.emptyCompleteScope && len(r.events) == 0 {
+			r.mu.Unlock()
+			return actool.Errorf("전체 조사 범위에서 수집된 이벤트가 없습니다. 필터를 바꿔 반복하지 말고 record_observation으로 자료 부족과 매핑·수집 상태 확인을 기록하세요"), nil
+		}
+		// Event kinds are normalized values, not guessed product/sourcetype
+		// names. Do not disguise a misspelled kind as a meaningful zero result.
+		if !q.Remote && q.EventKind != "" && len(r.events) > 0 {
+			kinds := map[string]int{}
+			for _, e := range r.events {
+				if e.EventKind != "" {
+					kinds[e.EventKind]++
+				}
+			}
+			if len(kinds) > 0 && kinds[q.EventKind] == 0 {
+				available, _ := json.Marshal(certCounts(kinds))
+				r.mu.Unlock()
+				return actool.Errorf(fmt.Sprintf("저장된 로그에 이 event_kind 값이 없습니다. 실제 종류는 %s입니다. 유형 필터를 제거하거나 실제 값을 사용하세요", string(available))), nil
+			}
+		}
+		page := q
+		page.Offset = 0
+		pageKey, _ := json.Marshal(page)
+		if total, ok := r.queryTotals[string(pageKey)]; ok && q.Offset >= total {
+			r.mu.Unlock()
+			return actool.Errorf("이 조회에는 다음 페이지가 없습니다. 확보한 근거를 기록하거나 필요한 로그를 남기세요"), nil
+		}
 		key, _ := json.Marshal(q)
 		if r.queryKeys[string(key)] {
 			r.mu.Unlock()
@@ -202,9 +228,9 @@ func (r *investigatorRun) searchTool() actool.CoreTool {
 			}
 			r.report.Collections = append(r.report.Collections, c)
 			r.evidenceBytes += len(body)
-			r.report.Gaps = append(r.report.Gaps, c.Warnings...)
+			r.report.Gaps = certUniqueStrings(append(r.report.Gaps, c.Warnings...))
 			if !c.Complete {
-				r.report.Gaps = append(r.report.Gaps, "추가 Splunk 조회 결과에 수집 범위 또는 절단 경고가 있습니다.")
+				r.report.Gaps = certUniqueStrings(append(r.report.Gaps, "추가 Splunk 조회 결과에 수집 범위 또는 절단 경고가 있습니다."))
 			}
 			for _, e := range c.Events {
 				if e.Ref != "" && r.inScope(e, q.Scope) {
@@ -213,6 +239,9 @@ func (r *investigatorRun) searchTool() actool.CoreTool {
 						selected = append(selected, e)
 					}
 				}
+			}
+			if c.Complete && len(r.events) == 0 && q.Scope.Target == base.Target && q.Scope.Start.Equal(base.Start) && q.Scope.End.Equal(base.End) && q.Scope.PathPrefix == base.PathPrefix && q.SourceIP == "" && q.User == "" && q.Session == "" && q.EventKind == "" && q.PathContains == "" {
+				r.emptyCompleteScope = true
 			}
 			return r.searchResultLocked(q, selected)
 		}
@@ -238,6 +267,13 @@ func (r *investigatorRun) searchResultLocked(q InvestigationSearch, selected []i
 		return selected[i].Timestamp.Before(selected[j].Timestamp)
 	})
 	total := len(selected)
+	page := q
+	page.Offset = 0
+	key, _ := json.Marshal(page)
+	if r.queryTotals == nil {
+		r.queryTotals = map[string]int{}
+	}
+	r.queryTotals[string(key)] = total
 	start := min(q.Offset, total)
 	end := min(start+20, total)
 	rows := make([]investigation.Event, 0, end-start)
@@ -253,7 +289,7 @@ func (r *investigatorRun) searchResultLocked(q InvestigationSearch, selected []i
 		rows = append(rows, e)
 	}
 	r.emitLocked(InvestigatorProgress{Kind: "query", Summary: fmt.Sprintf("조회 결과 %d개 중 %d개를 확인했습니다.", total, len(rows)), EvidenceRefs: refs})
-	return jsonResult(map[string]any{"events": rows, "total_matches": total, "next_offset": end, "has_more": end < total, "scope": q.Scope, "warning": "조회한 증거의 일부분입니다. 관측 없음은 침해 없음이 아닙니다. raw는 read_evidence로 확인하세요."})
+	return jsonResult(map[string]any{"events": rows, "total_matches": total, "next_offset": end, "has_more": end < total, "scope": q.Scope, "all_scope_empty": r.emptyCompleteScope, "instruction": "결과를 확보했으면 원문을 확인하고 record_observation으로 먼저 저장하세요. 0건이며 has_more=false이면 offset을 바꿔 반복하지 마세요.", "warning": "조회한 증거의 일부분입니다. 관측 없음은 침해 없음이 아닙니다. raw는 read_evidence로 확인하세요."})
 }
 
 func (r *investigatorRun) readTool() actool.CoreTool {
@@ -276,14 +312,14 @@ func (r *investigatorRun) readTool() actool.CoreTool {
 		for _, ref := range a.Refs {
 			e := r.events[ref]
 			r.rawSeen[ref] = true
-			rows = append(rows, map[string]any{"ref": ref, "file_name": e.FileName, "line": e.Line, "known_artex": e.KnownARTEX, "raw_excerpt": certClip(e.Raw, 4096), "raw_truncated": len(e.Raw) > 4096, "timestamp": e.Timestamp})
+			rows = append(rows, map[string]any{"ref": ref, "file_name": e.FileName, "line": e.Line, "known_artex": e.KnownARTEX, "source_ambiguous": e.SourceAmbiguous, "raw_excerpt": certClip(e.Raw, 4096), "raw_truncated": len(e.Raw) > 4096, "timestamp": e.Timestamp})
 		}
 		return jsonResult(rows)
 	})
 }
 
 func (r *investigatorRun) observationTool() actool.CoreTool {
-	return writeTool("record_observation", "AI 관측·추론·자료 부족을 기록합니다. observed는 직접 로그 행동에만 사용하고 실제 원문을 먼저 읽으세요. inferred는 정상 대안과 검증 방법이 필요합니다. 존재하지 않거나 이번 실행에서 읽지 않은 근거를 인용할 수 없습니다.", certObject(map[string]any{"kind": map[string]any{"type": "string", "enum": []string{"observed", "inferred", "insufficient_data"}}, "summary": str("근거가 직접 말하는 내용과 해석 범위"), "evidence_refs": certArray("실제로 확인한 이벤트 ref"), "alternatives": certArray("정상 행위·다른 해석 및 반증 가능성"), "next_steps": certArray("부족한 로그 및 다음 조사·탐지 개선")}, "kind", "summary"), func(ctx context.Context, in json.RawMessage) (actool.Result, error) {
+	return writeTool("record_observation", "AI 관측·추론·자료 부족을 기록합니다. observed는 제공된 raw_previews 또는 read_evidence 원문에 직접 기록된 행동에만 사용하세요. inferred는 정상 대안과 검증 방법이 필요합니다. 존재하지 않거나 이번 실행에서 읽지 않은 근거를 인용할 수 없습니다.", certObject(map[string]any{"kind": map[string]any{"type": "string", "enum": []string{"observed", "inferred", "insufficient_data"}}, "summary": str("근거가 직접 말하는 내용과 해석 범위"), "evidence_refs": certArray("실제로 확인한 이벤트 ref"), "alternatives": certArray("정상 행위·다른 해석 및 반증 가능성"), "next_steps": certArray("부족한 로그 및 다음 조사·탐지 개선")}, "kind", "summary"), func(ctx context.Context, in json.RawMessage) (actool.Result, error) {
 		if ctx.Err() != nil {
 			return actool.Errorf("조사가 종료되었습니다"), nil
 		}
@@ -329,9 +365,9 @@ func (r *investigatorRun) observationTool() actool.CoreTool {
 		}
 		o := InvestigatorObservation{ID: fmt.Sprintf("observation-%d", len(r.report.Observations)+1), IntentID: r.intentID, Kind: a.Kind, Summary: a.Summary, EvidenceRefs: a.EvidenceRefs, Alternatives: a.Alternatives, NextSteps: a.NextSteps, KnownARTEX: known}
 		r.report.Observations = append(r.report.Observations, o)
-		r.report.NextSteps = append(r.report.NextSteps, a.NextSteps...)
+		r.report.NextSteps = certUniqueStrings(append(r.report.NextSteps, a.NextSteps...))
 		if a.Kind == "insufficient_data" {
-			r.report.Gaps = append(r.report.Gaps, a.Summary)
+			r.report.Gaps = certUniqueStrings(append(r.report.Gaps, a.Summary))
 		}
 		r.emitLocked(InvestigatorProgress{Kind: "observation", Summary: o.Summary, Observation: &o, EvidenceRefs: o.EvidenceRefs})
 		return jsonResult(map[string]any{"saved": true, "observation": o, "assessment": "AI interpretation; references validated, semantic claim not independently verified"})

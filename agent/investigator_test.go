@@ -101,15 +101,15 @@ func certFixture() InvestigatorOptions {
 }
 func certHappyScript() []certScriptCall {
 	return []certScriptCall{
-		{"plan_investigation", `{"action":"investigate","reason":"노출 경로 접근 기록 확인","hypothesis":"과거 파일 접근이 있을 수 있다","objective":"첫 파일 접근 확인"}`, nil}, {},
+		{"plan_investigation", `{"action":"investigate","reason":"노출 경로 접근 기록 확인","hypothesis":"과거 파일 접근이 있을 수 있다","objective":"첫 파일 접근 확인"}`, nil},
 		{"search_evidence", `{"path_contains":"a.txt"}`, nil},
 		{"read_evidence", `{"refs":["ref-one"]}`, nil},
-		{"record_observation", `{"kind":"observed","summary":"/ftp/a.txt 요청이 로그에 기록됨. 내용 탈취 여부는 알 수 없음","evidence_refs":["ref-one"],"alternatives":["정상 사용자 접근일 수 있음"],"next_steps":["같은 출발지의 추가 파일 접근 확인"]}`, nil}, {},
-		{"plan_investigation", `{"action":"investigate","reason":"첫 접근 뒤 다른 파일 요청 확인","hypothesis":"같은 IP에서 후속 접근이 있을 수 있다","objective":"추가 파일 요청의 재현 트래픽 여부 확인","evidence_refs":["ref-one"]}`, nil}, {},
+		{"record_observation", `{"kind":"observed","summary":"/ftp/a.txt 요청이 로그에 기록됨. 내용 탈취 여부는 알 수 없음","evidence_refs":["ref-one"],"alternatives":["정상 사용자 접근일 수 있음"],"next_steps":["같은 출발지의 추가 파일 접근 확인"]}`, nil},
+		{"plan_investigation", `{"action":"investigate","reason":"첫 접근 뒤 다른 파일 요청 확인","hypothesis":"같은 IP에서 후속 접근이 있을 수 있다","objective":"추가 파일 요청의 재현 트래픽 여부 확인","evidence_refs":["ref-one"]}`, nil},
 		{"search_evidence", `{"path_contains":"b.txt","source_ip":"192.0.2.4"}`, nil},
 		{"read_evidence", `{"refs":["ref-two"]}`, nil},
-		{"record_observation", `{"kind":"inferred","summary":"두 요청의 출발 IP는 같지만 동일 공격자 여부는 확인되지 않음","evidence_refs":["ref-one","ref-two"],"alternatives":["공유 IP이며 ARTEX 재현 요청도 포함"],"next_steps":["인증 로그가 필요함"]}`, nil}, {},
-		{"plan_investigation", `{"action":"complete","reason":"허용된 파일 로그 조사를 완료했고 후속 인증 판단에는 별도 로그가 필요함","evidence_refs":["ref-one","ref-two"],"needed_logs":["인증 감사 로그"],"next_steps":["별도 인증 경로 범위로 조사"]}`, nil}, {},
+		{"record_observation", `{"kind":"inferred","summary":"두 요청의 출발 IP는 같지만 동일 공격자 여부는 확인되지 않음","evidence_refs":["ref-one","ref-two"],"alternatives":["공유 IP이며 ARTEX 재현 요청도 포함"],"next_steps":["인증 로그가 필요함"]}`, nil},
+		{"plan_investigation", `{"action":"complete","reason":"허용된 파일 로그 조사를 완료했고 후속 인증 판단에는 별도 로그가 필요함","evidence_refs":["ref-one","ref-two"],"needed_logs":["인증 감사 로그"],"next_steps":["별도 인증 경로 범위로 조사"]}`, nil},
 	}
 }
 
@@ -126,7 +126,7 @@ func TestInvestigatorActualHarnessPlansWorksReplans(t *testing.T) {
 			if err != nil || report.Status != "completed" || len(report.Decisions) != 3 || len(report.Intents) != 2 || len(report.Observations) != 2 {
 				t.Fatalf("report=%+v err=%v calls=%d", report, err, p.calls)
 			}
-			if report.Usage.ModelCalls != 14 || report.Usage.Queries != 2 || report.Usage.InputTokens != 140 || report.Usage.OutputTokens != 42 {
+			if report.Usage.ModelCalls != 9 || report.Usage.Queries != 2 || report.Usage.InputTokens != 90 || report.Usage.OutputTokens != 27 {
 				t.Fatalf("usage=%+v", report.Usage)
 			}
 			if !p.seenRaw || !report.Observations[1].KnownARTEX || len(report.Observations[1].Alternatives) < 2 {
@@ -257,8 +257,8 @@ func TestInvestigatorModelBudgetsStopBeforeProvider(t *testing.T) {
 
 func TestInvestigatorModelFailurePreservesPriorEvidence(t *testing.T) {
 	o := certFixture()
-	script := certHappyScript()[:7]
-	script[6] = certScriptCall{err: errors.New("fixture provider unavailable")}
+	script := certHappyScript()[:5]
+	script[4] = certScriptCall{err: errors.New("fixture provider unavailable")}
 	o.Provider = &certScriptProvider{t: t, script: script}
 	r, err := RunInvestigation(t.Context(), o)
 	if err == nil || r.Status != "model_error" || len(r.Observations) != 1 || r.Observations[0].EvidenceRefs[0] != "ref-one" {

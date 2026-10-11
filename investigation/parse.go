@@ -171,6 +171,7 @@ func ParseFiles(files []InputFile, s Scope, m Mapping, coverageConfirmed, target
 		}
 	}
 	total := 0
+	ambiguousSources := 0
 	names := map[string]bool{}
 	hashes := map[string]bool{}
 	warn := func(message string) {
@@ -296,7 +297,7 @@ func ParseFiles(files []InputFile, s Scope, m Mapping, coverageConfirmed, target
 				id = ref
 			}
 			st, stOK := textField(fields["sourcetype"])
-			src, srcOK := textField(fields["source"])
+			src, sourceAmbiguous, srcOK := sourceMetadata(fields["source"])
 			host, hostOK := textField(fields["host"])
 			index, indexOK := textField(fields["index"])
 			if !stOK || !srcOK || !hostOK || !indexOK {
@@ -304,8 +305,15 @@ func ParseFiles(files []InputFile, s Scope, m Mapping, coverageConfirmed, target
 				return nil
 			}
 			sourceKey, _ := json.Marshal([]string{f.Name, st, src, host, index})
+			if sourceAmbiguous {
+				// JSON payloads can also have a source key. Splunk may merge it
+				// with indexed metadata. Keep the scoped event and every raw
+				// value, but never pick one origin or join these records as a flow.
+				sourceKey, _ = json.Marshal([]string{f.Name, st, src, host, index, ref})
+			}
 			source := string(sourceKey)
 			e := Event{Ref: ref, ID: id, Timestamp: when, Target: target, Path: path, SourceIP: values[1], User: values[2], Session: values[3], Action: values[4], Status: values[5], VerificationID: values[6], EventKind: strings.ToLower(values[7]), FileName: f.Name, Source: source, Line: line, Raw: raw}
+			e.SourceAmbiguous = sourceAmbiguous
 			if b := get(m.Bytes); b != nil && b != "" {
 				bv, valid := scalar(b)
 				n, er := strconv.ParseInt(bv, 10, 64)
@@ -348,6 +356,9 @@ func ParseFiles(files []InputFile, s Scope, m Mapping, coverageConfirmed, target
 			}
 			out.Events = append(out.Events, e)
 			out.Stats.Selected++
+			if sourceAmbiguous {
+				ambiguousSources++
+			}
 			return nil
 		})
 		if err != nil {
@@ -357,6 +368,10 @@ func ParseFiles(files []InputFile, s Scope, m Mapping, coverageConfirmed, target
 	}
 	if out.Stats.Truncated > 0 {
 		warn(fmt.Sprintf("선택 이벤트 한도 2000건을 초과해 %d건은 분석에 포함되지 않았습니다. 기간·경로를 좁혀 다시 수집하세요.", out.Stats.Truncated))
+	}
+	if ambiguousSources > 0 {
+		out.Complete = false
+		out.Warnings = append(out.Warnings, fmt.Sprintf("이벤트 %d건의 source 필드에 서로 다른 출처 값이 있습니다. 원본과 개별 행동은 보존했으며 동일 출처의 요청 흐름 연결에서는 제외했습니다. Splunk 메타데이터와 JSON 내부 source 필드를 구분해 확인하세요.", ambiguousSources))
 	}
 	if out.Stats.MissingTarget > 0 && targetScopeConfirmed {
 		out.Warnings = append(out.Warnings, "대상 필드가 없는 이벤트는 업로더가 확인한 자산 범위를 사용합니다. 이벤트 자체로 자산이 검증된 것은 아닙니다.")
@@ -385,6 +400,36 @@ func textField(v any) (string, bool) {
 	}
 	s, ok := v.(string)
 	return s, ok
+}
+
+// Only provenance source metadata admits a bounded string array. Scope,
+// identity, action and time fields remain strictly scalar. Equal duplicates
+// have one unambiguous value; conflicting values are preserved, never chosen.
+func sourceMetadata(v any) (string, bool, bool) {
+	if s, ok := textField(v); ok {
+		return s, false, true
+	}
+	values, ok := v.([]any)
+	if !ok || len(values) == 0 || len(values) > 32 {
+		return "", false, false
+	}
+	unique := []string{}
+	seen := map[string]bool{}
+	for _, value := range values {
+		s, valid := value.(string)
+		if !valid || len(s) > 4096 {
+			return "", false, false
+		}
+		if !seen[s] {
+			unique = append(unique, s)
+			seen[s] = true
+		}
+	}
+	if len(unique) == 1 {
+		return unique[0], false, true
+	}
+	b, _ := json.Marshal(unique)
+	return string(b), true, true
 }
 func lookup(m map[string]any, key string) (any, bool) {
 	if v, ok := m[key]; ok {

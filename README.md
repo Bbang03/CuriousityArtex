@@ -103,6 +103,7 @@ docker compose --env-file .env.local -f docker-compose.local.yml stop
 - [실제 소스 분석과 개발 범위](docs/aegisloop-source-analysis.md): 호출 관계, 재사용·확장 지점과 후속 요구사항.
 - [방어 검증](docs/purple-validation.md): 재검증, 파일/Splunk 근거, 판정 의미와 한계.
 - [에이전트 침해 조사](docs/cert-investigation.md): **1. 로그 근거 준비 → 2. AI 조사**, 후속 조회·예산·인용·중지·이력.
+- [사용 가이드](docs/USER_GUIDE_KO.md): 진단·방어 검증·침해 조사의 핵심 사용 순서.
 - [로컬 실행과 실습](docs/local-development.md): 초기 설정, 로그 수집과 내보내기, 테스트.
 - [WAF·Splunk 선택형 실습 환경](docs/purple-lab.md): 별도 Juice Shop 대상의 탐지·차단·미탐 비교.
 - [Attack Range 선택형 설치](docs/attack-range.md): 공식 관리 API·웹 UI를 로컬 Docker로 설치하고, Windows/Linux 클라우드 실습 서버 구축과 구분합니다.
@@ -128,7 +129,7 @@ docker compose --env-file .env.local -f docker-compose.local.yml stop
 
 </details>
 
-공개 증적의 Juice Shop은 기능을 확인하기 위해 **별도로 띄운 실습 대상**이며 제품의 설치 구성에 포함되지 않습니다. AWS 역시 임시 시연·증적을 위한 별도 환경이며 장기 서비스 인프라 구축이 프로젝트의 목표는 아닙니다. 운영 DB, 원본 로그, LLM 키, JWT 키는 배포하지 않습니다. 모의 Splunk 테스트는 연결·범위 제한·증거 보존을 검증합니다. **실제 기업 Splunk 연결이나 탐지 정확도를 입증한 것은 아닙니다.** 공개한 실제 AI 조사 이력은 사용자 중지 상태이므로 완주·침해 확정 성공 사례로 제시하지 않습니다.
+공개 증적의 Juice Shop은 기능을 확인하기 위해 **별도로 띄운 실습 대상**이며 제품의 설치 구성에 포함되지 않습니다. AWS 역시 임시 시연·증적을 위한 별도 환경이며 장기 서비스 인프라 구축이 프로젝트의 목표는 아닙니다. 운영 DB, 원본 로그, LLM 키, JWT 키는 배포하지 않습니다. 모의 Splunk 테스트는 연결·범위 제한·증거 보존을 검증합니다. **실제 기업 Splunk 연결이나 탐지 정확도를 입증한 것은 아닙니다.** 공개한 실제 AI 조사 이력은 사용자 중지 또는 실행 한도 도달 상태이므로 완주·침해 확정 성공 사례로 제시하지 않습니다.
 
 ## 기반 프로젝트 문서
 

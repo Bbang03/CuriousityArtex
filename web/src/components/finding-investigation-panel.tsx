@@ -39,12 +39,31 @@ import {
   type InvestigationRecord,
   investigationApi,
 } from "@/lib/investigation-api";
+import { investigationMappingForSource } from "@/lib/investigation-mapping";
 import { downloadSecurityJSON, type SecuritySource, securityApi } from "@/lib/security-api";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const PAGE_SIZE = 25;
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50";
 type LoadedFile = { name: string; content: string; bytes: number };
+
+export function InvestigationEvidenceNotice({ record }: { record: InvestigationEvidenceRecord }) {
+  const t = useTranslations("investigation");
+  if (record.collection.events?.length) return null;
+  return (
+    <Alert className="border-amber-500/40 bg-amber-500/5">
+      <AlertDescription className="space-y-2">
+        <p className="font-medium">{t("emptyEvidenceTitle")}</p>
+        <p>
+          {t(record.source_kind === "splunk" ? "emptySplunkEvidenceHelp" : "emptyFileEvidenceHelp", {
+            field: record.mapping.target,
+            target: record.scope.target,
+          })}
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 function localTime(time: number) {
   const date = new Date(time);
@@ -688,11 +707,7 @@ export function FindingInvestigationPanel({
     setPreview(null);
     setCoverageConfirmed(false);
     setTargetScopeConfirmed(false);
-    setMapping(
-      next === "splunk"
-        ? { ...DEFAULT_INVESTIGATION_MAPPING, timestamp: "_time", event_id: "_cd", target: "host" }
-        : { ...DEFAULT_INVESTIGATION_MAPPING },
-    );
+    setMapping((current) => investigationMappingForSource(current, sourceKind, next));
   };
 
   return (
@@ -975,6 +990,7 @@ export function FindingInvestigationPanel({
                     <p className="text-muted-foreground text-xs">{t("sourcetypesHelp")}</p>
                   </div>
                   <p className="text-muted-foreground text-xs leading-relaxed">{t("splunkHelp")}</p>
+                  <p className="text-sm leading-relaxed">{t("splunkTargetMappingHelp", { field: mapping.target })}</p>
                 </div>
               )}
               <details className="rounded-lg border p-4">
@@ -1047,7 +1063,8 @@ export function FindingInvestigationPanel({
         </Card>
       ) : null}
       {record ? (
-        <div ref={resultRef} className="scroll-mt-28">
+        <div ref={resultRef} className="scroll-mt-28 space-y-3">
+          <InvestigationEvidenceNotice record={record} />
           <FindingInvestigationAgentPanel
             key={`agent-${record.id}`}
             findingId={findingId}

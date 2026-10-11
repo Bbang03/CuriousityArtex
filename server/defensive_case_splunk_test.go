@@ -135,7 +135,7 @@ func TestDefensiveCaseSplunkPreviewCallbackAndRevision(t *testing.T) {
 				}
 				return
 			}
-			if done.Status != "completed" || calls.Load() != 2 || len(proofs) != 1 || len(report.Observations) != 1 || report.Observations[0].Kind != "observed" || p.calls.Load() != 8 {
+			if done.Status != "completed" || calls.Load() != 2 || len(proofs) != 1 || len(report.Observations) != 1 || report.Observations[0].Kind != "observed" || p.calls.Load() != 5 {
 				t.Fatalf("server callback did not finish actual agent loop: status=%s calls=%d modelcalls=%d proofs=%d result=%s", done.Status, calls.Load(), p.calls.Load(), len(proofs), done.Result)
 			}
 			proof := proofs[0]

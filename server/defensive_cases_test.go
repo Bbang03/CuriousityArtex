@@ -169,7 +169,7 @@ func TestDefensiveCaseAgentAsyncNoFinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	done := waitDefensiveCaseRun(t, s, &run)
-	if done.Status != "insufficient_data" || done.Usage.ModelCalls != 2 || len(done.Events) == 0 {
+	if done.Status != "insufficient_data" || done.Usage.ModelCalls != 1 || len(done.Events) == 0 {
 		t.Fatal("actual planner harness not used", done.Status, done.Usage)
 	}
 	var report agent.InvestigatorReport
