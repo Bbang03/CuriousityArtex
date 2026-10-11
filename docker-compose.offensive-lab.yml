@@ -1,0 +1,209 @@
+# Local Offensive practice only. Based on OWASP/crAPI v1.1.6 compose.
+# Official multi-platform images are pinned by digest; no cloud/LLM key is used.
+name: aegis-offensive
+
+x-crapi-db: &crapi-db
+  DB_NAME: crapi
+  DB_USER: admin
+  DB_PASSWORD: ${CRAPI_DB_PASSWORD:?Run scripts/offensive-prepare.sh}
+  DB_HOST: postgresdb
+  DB_PORT: "5432"
+  TLS_ENABLED: "false"
+  LOG_LEVEL: INFO
+
+x-crapi-mongo: &crapi-mongo
+  MONGO_DB_HOST: mongodb
+  MONGO_DB_PORT: "27017"
+  MONGO_DB_USER: admin
+  MONGO_DB_PASSWORD: ${CRAPI_DB_PASSWORD}
+  MONGO_DB_NAME: crapi
+
+x-health: &service-health
+  test: [CMD-SHELL, /app/health.sh]
+  interval: 10s
+  timeout: 10s
+  retries: 25
+  start_period: 20s
+
+services:
+  postgresdb:
+    image: postgres:14@sha256:14bfab572eec6abf65892e1db7c3ba8d41b2a2855c1b143664907d6e146eb6e1
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${CRAPI_DB_PASSWORD}
+      POSTGRES_DB: crapi
+    volumes: [crapi-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U admin -d crapi]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 384m
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:4.4@sha256:4be76f674fc4b27859816811b8baa3c51830eb1dbf4ca81a51e26b79edd662ef
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${CRAPI_DB_PASSWORD}
+    volumes: [crapi-mongo:/data/db]
+    healthcheck:
+      test: [CMD-SHELL, "echo 'db.runCommand(\"ping\").ok' | mongo localhost:27017/test --quiet"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    mem_limit: 512m
+    restart: unless-stopped
+
+  mailhog:
+    image: crapi/mailhog@sha256:015c23f79d40c9dc1800cd0a458503b89aeda3b585a12c37d53829d6c7d61fdd
+    environment:
+      MH_MONGO_URI: admin:${CRAPI_DB_PASSWORD}@mongodb:27017
+      MH_STORAGE: mongodb
+    depends_on:
+      mongodb: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, nc, -z, localhost, "8025"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 128m
+    restart: unless-stopped
+
+  crapi-identity:
+    image: crapi/crapi-identity@sha256:51b4cdd1a88f24e00e66c4c37735e7f8adbb98071252f3cf4f6dda9e00671aed
+    environment:
+      <<: *crapi-db
+      SERVER_PORT: "8080"
+      ENABLE_SHELL_INJECTION: "false"
+      ENABLE_LOG4J: "false"
+      JWT_SECRET: crapi
+      JWT_EXPIRATION: "604800000"
+      MAILHOG_HOST: mailhog
+      MAILHOG_PORT: "1025"
+      MAILHOG_DOMAIN: example.com
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      SMTP_EMAIL: user@example.com
+      SMTP_PASS: unused-local-lab
+      SMTP_FROM: no-reply@example.com
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+      API_GATEWAY_URL: http://crapi-web:80
+    depends_on:
+      postgresdb: {condition: service_healthy}
+      mongodb: {condition: service_healthy}
+      mailhog: {condition: service_healthy}
+    healthcheck: *service-health
+    mem_limit: 768m
+    restart: unless-stopped
+
+  crapi-community:
+    image: crapi/crapi-community@sha256:8ba0c7eda86ae065a673f1fa554d0109a24f25c5a8d65097ae024e5ee715c54e
+    environment:
+      <<: [*crapi-db, *crapi-mongo]
+      IDENTITY_SERVICE: crapi-identity:8080
+      SERVER_PORT: "8087"
+    depends_on:
+      crapi-identity: {condition: service_healthy}
+    healthcheck: *service-health
+    mem_limit: 256m
+    restart: unless-stopped
+
+  crapi-workshop:
+    image: crapi/crapi-workshop@sha256:d4d2d94d35a31e211b04d5a771881f5ae13e358e8fa0804463ae3bace05dd815
+    environment:
+      <<: [*crapi-db, *crapi-mongo]
+      IDENTITY_SERVICE: crapi-identity:8080
+      SERVER_PORT: "8000"
+      SECRET_KEY: crapi
+      API_GATEWAY_URL: http://crapi-web:80
+      FILES_LIMIT: "1000"
+    depends_on:
+      crapi-community: {condition: service_healthy}
+    healthcheck: *service-health
+    mem_limit: 384m
+    restart: unless-stopped
+
+  crapi-web:
+    image: crapi/crapi-web@sha256:b27d246c646bd33898e7d1d2095b6e7576c0993a7b81a73aa7386929493d7151
+    environment:
+      COMMUNITY_SERVICE: crapi-community:8087
+      IDENTITY_SERVICE: crapi-identity:8080
+      WORKSHOP_SERVICE: crapi-workshop:8000
+      MAILHOG_WEB_SERVICE: mailhog:8025
+      # GenAI chatbot is outside this API assessment profile. Closed local port.
+      CHATBOT_SERVICE: 127.0.0.1:9
+      TLS_ENABLED: "false"
+    depends_on:
+      crapi-workshop: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1/health]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 128m
+    restart: unless-stopped
+
+  offensive-runner:
+    image: aegis-offensive-runner:local
+    build:
+      context: .
+      dockerfile: Dockerfile.offensive-runner
+    environment:
+      ARTEX_OFFENSIVE_TOKEN_FILE: /run/offensive/token
+      OFFENSIVE_CRAPI_URL: http://crapi-web:80
+      OFFENSIVE_CRAPI_REVISION: 700f03d12a392d9e408260b4beae72ed02a4a1a4
+      OFFENSIVE_BENCHMARK_REVISION: 8b67a88d73b2594570fc21150705283de884620b
+      OFFENSIVE_TARGETS_DIR: /data/offensive/targets
+    volumes:
+      - ./.local-runtime/offensive/token:/run/offensive/token:ro
+      - ./.local-runtime/offensive/BenchmarkJava/src/main/java:/opt/benchmark/src/main/java:ro
+      - ./.local-runtime/offensive/crAPI/openapi-spec:/opt/crapi-schema:ro
+      - ./data/offensive/runs:/data/offensive/runs
+      - ./data/offensive/targets:/data/offensive/targets
+    # Only the assessment runner needs access to user-registered API servers.
+    # Vulnerable practice services stay on the internal lab network.
+    networks: [default, assessment-egress]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    cpus: 2
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # This reverse proxy publishes the practice UI on loopback only.
+  # Docker Desktop does not publish ports for containers on internal-only nets.
+  lab-ingress:
+    image: nginx:stable-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    ports: ["127.0.0.1:18888:80", "127.0.0.1:18025:8025"]
+    volumes:
+      - ./lab/offensive/ingress.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [default, ingress]
+    depends_on:
+      crapi-web: {condition: service_healthy}
+      mailhog: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1/health]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 64m
+    restart: unless-stopped
+
+networks:
+  default:
+    name: aegis-offensive-lab
+    internal: true
+  ingress: {}
+  assessment-egress: {}
+
+volumes:
+  crapi-postgres:
+  crapi-mongo:

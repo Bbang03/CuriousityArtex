@@ -1,19 +1,23 @@
 # AegisLoop 소스 배포 — 2026-10-11
 
-현재까지 구현한 기능과 실제 검증 증적을 묶은 소스 배포본입니다. ARTEX-KO 기반이며 원본·한국어판 저작권 표시와 AGPL-3.0 라이선스를 유지합니다. 새로운 기능 추가 없이 현재 버전을 배포용으로 정리했습니다.
+현재까지 구현한 기능과 실제 검증 증적을 묶은 소스 배포본입니다. ARTEX-KO 기반이며 원본·한국어판 저작권 표시와 AGPL-3.0 라이선스를 유지합니다. 이번에는 완성된 API·소스 진단 확장과 웹 증적을 배포본에 반영했습니다.
 
 ## 이번 배포본에 반영한 내용
 
 - [사용 가이드](docs/USER_GUIDE_KO.md)와 사용자가 직접 수행한 취약점 진단·방어 검증·침해 조사 캡처 7장.
+- API 진단에서 기존 **OpenAPI 명세 업로드**를 유지하고 **URL 탐색·HAR 업로드**를 추가. 발견한 GET/HEAD 경로를 웹에서 직접 선택해 검사합니다.
+- 사용자 **소스 ZIP 업로드·대상 선택·Semgrep 정적 분석**과 기존 ARTEX 심층 검토 연결.
+- README·사용 가이드에 실제 입력 선택 화면과 URL·HAR·소스 ZIP 결과 캡처 추가. 탐지·Splunk·Defensive·Closed-loop 기능은 이번 진단 확장에서 변경하지 않았습니다.
 - AI 조사에 실제 로그 유형·대표 근거·조사 질문을 전달하고 불필요한 모델 호출을 줄인 수정.
 - Splunk 대상 필드 매핑 보존과 출처가 모호한 이벤트의 원문 보존. 불완전한 수집을 완료로 표시하지 않습니다.
-- 최신 조사 수정의 회귀 검사 351개와 웹 빌드 확인. 실제 LLM 조사 완주를 검증한 결과와는 구분합니다.
+- API 확장까지 반영한 Go 회귀 검사 229개(하위 항목 포함 380개), 실행기 검사 35개와 앱·실행기 빌드 통과. 실제 LLM 조사 완주를 검증한 결과와는 구분합니다.
 
 배포본은 최신 소스와 문서를 함께 포함합니다. 캡처의 조사 실행 한도 도달 상태도 그대로 보존했습니다.
 
 ## 포함 기능
 
 - 기존 ARTEX 취약점 진단과 재검증.
+- 명세·URL·HAR 기반 API 진단과 Java·Python·JavaScript·TypeScript 소스 ZIP 진단. crAPI·Benchmark는 선택형 실습 대상입니다.
 - 파일 업로드 또는 Splunk 조회를 이용한 방어 검증·침해 조사 근거 준비.
 - 취약점 없이 시작하는 Defensive 사건과 읽기 전용 AI 조사.
 - Closed-loop 실행 이력, 규칙 평가, 개선 전후 근거 비교.
@@ -21,6 +25,19 @@
 - 실습 Splunk의 전용 규칙 적용, 실제 감사·경보 수집, 단계별 근거·오탐 원인·타임라인·JSON 내보내기.
 
 전체 Atomic Red Team 카탈로그 선택 기능은 없습니다. 체인 개선 후보는 고정된 행위 프로파일이며 임의 규칙의 자율 생성·운영 SIEM 자동 배포 기능이 아닙니다.
+
+## 실제 API · 소스 진단 검증
+
+| 입력·실행 | 확인 결과 |
+|---|---|
+| crAPI 홈페이지 URL 탐색 | HTML·연결된 JS를 조회해 GET 후보 9개 발견 |
+| 웹 URL·HAR 진단 | 각각 선택한 두 경로의 실제 401 응답과 인증 제한 표시 |
+| 같은 두 경로의 별도 인증 진단 | HTTP 200 응답 2건, URL 탐색 기반 서버 오류 후보 0건 |
+| Benchmark Java 소스 ZIP | 30파일 분석, 정적 후보 12건과 파일·줄 근거 표시 |
+
+인증 진단은 내부 실행 API에서 시작했고, 웹에서 결과를 확인했습니다. 이번 URL·HAR 검증에는 새 LLM 호출을 포함하지 않았습니다. [URL·HAR 실제 캡처·검증 범위](docs/evidence/offensive-api-discovery-validation-2026-10-11.md)와 [명세·소스 업로드 증적](docs/evidence/offensive-upload-validation-2026-10-11.md)을 제공합니다.
+
+API 도구 진단은 선택한 GET/HEAD만 실행합니다. URL·HAR는 공식 응답 명세를 만들지 않으므로 서버 오류만 검사하고, 기존 OpenAPI 방식은 명세 기반 응답 계약도 검사합니다. URL 발견 결과는 API 전수 목록이 아니며, 정적 분석 후보나 서버 오류 후보 0건도 보안 검증 완료를 뜻하지 않습니다. 원본 HAR 인증 정보는 자동 재사용하지 않으며, 필요한 토큰은 실행 시 별도로 입력합니다.
 
 ## 실제 AWS 검증
 
@@ -40,7 +57,7 @@ Docker와 Compose v2를 실행하고 압축을 푼 소스 폴더에서 다음 �
 ./scripts/local-start.sh
 ```
 
-`http://localhost:8787/setup/`에서 본인의 관리자 비밀번호를 설정합니다. 기본 배포는 ARTEX와 PostgreSQL만 시작합니다. Juice Shop·Splunk·AWS 서버는 자동 설치하지 않습니다. AI 기능에는 본인의 LLM 연결이 필요합니다. AWS 실습 탭은 [별도 실습 환경 연결](docs/aws-windows-loop.md)을 구성한 뒤 사용할 수 있습니다.
+`http://localhost:8787/setup/`에서 본인의 관리자 비밀번호를 설정합니다. 기본 배포는 ARTEX와 PostgreSQL만 시작합니다. Juice Shop·Splunk·AWS 서버는 자동 설치하지 않습니다. API·소스 진단은 [별도 진단 서비스 준비](docs/offensive-assessments.md), AWS 실습 탭은 [별도 실습 환경 연결](docs/aws-windows-loop.md)을 진행하세요. crAPI·Benchmark는 필수 설치 대상이 아닌 선택형 예제입니다. AI 기능에는 본인의 LLM 연결이 필요합니다.
 
 개발자의 API 키, AWS·Splunk 계정, JWT 키, `.env.local`, 운영 DB, 원본 실습 로그 및 `.git` 이력은 소스 압축에 포함하지 않습니다. 공개 화면과 문서는 포함하지만 캡처 속 실행 이력이 새 설치 DB에 들어가지는 않습니다.
 
@@ -50,4 +67,4 @@ Docker와 Compose v2를 실행하고 압축을 푼 소스 폴더에서 다음 �
 
 ZIP 파일 자체는 GitHub Release 첨부용으로도 사용할 수 있습니다. 저장소를 clone해서 실행하게 하려면 ZIP만 올리는 대신 그 안의 소스 파일을 커밋해야 합니다. 이 작업에서는 GitHub에 직접 푸시하지 않았습니다.
 
-실행·테스트·제외 기준은 [배포 안내](docs/release.md), 이번 새 설치 검증은 [배포 검증 기록](docs/evidence/release-guide-validation-2026-10-11.md)을 참고하세요.
+실행·테스트·제외 기준은 [배포 안내](docs/release.md), 이번 새 설치 검증은 [배포 검증 기록](docs/evidence/release-api-discovery-validation-2026-10-11.md)을 참고하세요.

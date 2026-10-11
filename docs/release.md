@@ -2,7 +2,7 @@
 
 배포 단위는 이 저장소의 소스와 문서입니다. 기본 실행은 `Dockerfile.local`에서 소스를 빌드하고 `docker-compose.local.yml`로 **ARTEX와 PostgreSQL**을 시작합니다. 공개되지 않은 상류 ARTEX 이미지, 개발자의 API 키, 기존 운영 DB가 필요하지 않습니다. Juice Shop은 화면 증적을 만들 때 별도로 사용한 실습 대상이며 기본 제품 배포에 포함하지 않습니다.
 
-[사용 가이드](USER_GUIDE_KO.md)와 직접 수행한 진단·방어 검증·침해 조사 캡처 7장을 함께 제공합니다. GitHub에는 소스와 `docs/`를 함께 올려야 이미지가 표시됩니다. ZIP만 올리는 대신 압축 안의 소스를 저장소에 반영하고, 커밋·푸시는 저장소 소유자가 진행합니다. 이번 배포의 확인 범위는 [최신 배포 검증 기록](evidence/release-guide-validation-2026-10-11.md)에 있습니다.
+[사용 가이드](USER_GUIDE_KO.md)에 기존 진단·방어 검증·침해 조사와 새 API·소스 ZIP 진단 캡처를 함께 제공합니다. README에도 명세·URL·HAR 선택 화면과 실제 결과가 표시됩니다. GitHub에는 소스와 `docs/`를 함께 올려야 이미지가 표시됩니다. ZIP만 올리는 대신 압축 안의 소스를 저장소에 반영하고, 커밋·푸시는 저장소 소유자가 진행합니다. 이번 배포의 확인 범위는 [최신 배포 검증 기록](evidence/release-api-discovery-validation-2026-10-11.md)에 있습니다.
 
 ## 처음 받는 사용자의 실행 순서
 
@@ -21,6 +21,18 @@
 스크립트는 `.env.local`에 임의 DB 비밀번호, `.local-runtime/jwt.key`에 로그인 서명·연결 인증 정보 암호화용 키를 생성합니다. 기존 파일은 유지하며, 기존 키가 비어 있으면 자동 교체하지 않고 복구를 요청합니다. JWT 키는 해당 DB와 함께 로컬에 보존해야 하며 공개 저장소에 포함하지 않습니다.
 
 자세한 운영 명령과 포트 변경은 [로컬 실행 안내](local-development.md)를 참고하세요. 루트의 기존 `install.sh`·`docker-compose.yml`은 상류 참고 경로이며, 이 확장의 기본 설치 절차가 아닙니다.
+
+## 선택형 API · 소스 ZIP 진단
+
+명세·URL·HAR API 진단과 소스 ZIP 분석 도구, 공식 crAPI·Benchmark 예제를 준비하려면 다음 명령을 실행합니다.
+
+```sh
+./scripts/offensive-start.sh
+```
+
+이 명령은 Schemathesis·Semgrep 실행기를 빌드하고, 고정 커밋의 공식 실습 소스를 내려받으며, 로컬 인증값을 새로 생성합니다. 배포자의 API 키·토큰·등록 대상·진단 이력은 복사하지 않습니다. `Offensive → API · 소스 코드 진단`에서 자신의 명세/URL/HAR/소스 ZIP이나 설치된 예제를 선택합니다. 자세한 순서는 [API·소스 진단 가이드](offensive-assessments.md)를 참고하세요.
+
+기본 설치에 crAPI·Benchmark·Juice Shop·Splunk가 필수인 것은 아닙니다. 현재 제공하는 `offensive-start.sh`는 실행기와 crAPI 예제를 함께 준비하는 선택형 실습 묶음입니다. 이미 이 실습을 실행 중인 컴퓨터에서 두 번째 복사본으로 같은 스크립트를 실행하면 동일한 Compose 프로젝트를 사용하므로, 복사본 검증 시에는 실행기 이미지 빌드와 별도 기본 앱 프로젝트를 이용합니다.
 
 ## 선택형 AWS Windows 실습 연결
 
@@ -57,6 +69,20 @@ python3 -I scripts/check-doc-links.py
 
 소스 압축이나 공개 커밋에는 `Dockerfile.range-bridge`, `docker-compose.range-bridge.yml`, `lab/attack-range/bridge.py`·`runtime.py`·`chain_runtime.py`와 `requirements-bridge.txt`, 설정·감사 준비 도구, 관련 테스트를 함께 포함합니다. 특히 새 `chain_runtime.py`를 빠뜨리면 선택형 브리지 이미지 빌드가 실패합니다. `git archive HEAD`는 마지막 커밋만 포함하므로 아직 커밋하지 않은 변경·새 파일이 빠집니다. 압축 전에 포함 목록과 파일 내용을 확인합니다. 기존 `build.sh`의 플랫폼별 바이너리 ZIP은 이 Docker 소스 배포본과 다른 산출물입니다.
 
+새 API 진단에는 `Dockerfile.offensive-runner`, Offensive Compose 두 파일, `lab/offensive/` 전체(특히 `api_discovery.py`와 규칙), `scripts/offensive-*.sh`, 서버·웹 코드와 두 진단 Skill을 함께 포함해야 합니다.
+
+### 배포용 폴더 · ZIP 만들기
+
+Git 체크아웃에서 현재 저장된 소스와 새 파일을 포함해 배포본을 만듭니다.
+
+```sh
+python3 scripts/package-release.py --name aegisloop-public-20261011-api-discovery
+```
+
+`release-artifacts/`에 같은 이름의 소스 폴더와 ZIP, ZIP의 SHA-256 파일이 생성됩니다. 소스 폴더의 `SOURCE_MANIFEST.sha256`은 포함된 파일의 해시입니다. 같은 이름이 이미 있으면 덮어쓰지 않습니다. Git 이력과 실행 데이터·실제 환경 파일·키는 제외하며, 추적 파일이라도 제외 경로 규칙을 적용합니다. 이 경로 검사는 소스 안에 잘못 붙여 넣은 비밀값까지 찾아내는 기능은 아니므로 최종 폴더에 별도 비밀 탐지 검사를 실행합니다.
+
+기존 GitHub 저장소에 반영할 때는 **배포 폴더 안의 내용**을 저장소 루트에 복사합니다. `.gitignore`, `.dockerignore`, `.env.example` 같은 숨김 파일도 포함하고, 기존 저장소의 `.git`은 유지하세요. GitHub Desktop에서 변경 파일을 검토하고 직접 커밋·푸시합니다. 이 ZIP에는 과거 Git 이력이 없으며, 대상 저장소의 기존 이력은 별도 검사 대상입니다.
+
 공개할 커밋에서 다음을 확인합니다.
 
 - `git status --short`와 `git diff --cached --stat`로 의도한 소스·문서·검토된 화면만 포함됐는지 확인합니다.
@@ -72,20 +98,20 @@ python3 -I scripts/check-doc-links.py
 ```sh
 ARTEX_PROJECT_NAME=artex-clean-check \
 ARTEX_LOCAL_IMAGE=artex-clean-check:dev \
-ARTEX_LOCAL_PORT=18887 \
-ARTEX_LOCAL_PROXY_PORT=18888 \
+ARTEX_LOCAL_PORT=18897 \
+ARTEX_LOCAL_PROXY_PORT=18898 \
 ./scripts/local-start.sh
 ```
 
-[http://localhost:18887/setup/](http://localhost:18887/setup/)에서 새 초기 설정 화면을 확인합니다. 키·DB를 복사하지 않았으므로 기존 개발자의 로그인, LLM 연결, 작업과 로그가 나타나면 안 됩니다. 이 명령은 자체 데이터 볼륨을 만들며 실제 점검이나 AI 조사를 자동 실행하지 않습니다.
+[http://localhost:18897/setup/](http://localhost:18897/setup/)에서 새 초기 설정 화면을 확인합니다. 키·DB를 복사하지 않았으므로 기존 개발자의 로그인, LLM 연결, 작업과 로그가 나타나면 안 됩니다. 이 명령은 자체 데이터 볼륨을 만들며 실제 점검이나 AI 조사를 자동 실행하지 않습니다.
 
 확인이 끝나면 같은 프로젝트 이름으로 테스트용 앱을 중지합니다. 아래 명령은 데이터를 삭제하지 않습니다.
 
 ```sh
 ARTEX_PROJECT_NAME=artex-clean-check \
 ARTEX_LOCAL_IMAGE=artex-clean-check:dev \
-ARTEX_LOCAL_PORT=18887 \
-ARTEX_LOCAL_PROXY_PORT=18888 \
+ARTEX_LOCAL_PORT=18897 \
+ARTEX_LOCAL_PROXY_PORT=18898 \
 docker compose --env-file .env.local -f docker-compose.local.yml stop
 ```
 

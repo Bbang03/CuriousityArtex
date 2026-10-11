@@ -1,0 +1,58 @@
+rules:
+  - id: aegis.java.sql-concatenated-query
+    languages: [java]
+    severity: WARNING
+    message: SQL 실행에 동적 쿼리가 사용됩니다. 입력 흐름과 매개변수화를 확인하세요.
+    metadata:
+      category: security
+      cwe: CWE-89
+    patterns:
+      - pattern-either:
+          - pattern: $S.executeQuery($Q)
+          - pattern: $S.executeUpdate($Q)
+          - pattern: $S.execute($Q)
+      - pattern-not: $S.executeQuery("...")
+      - pattern-not: $S.executeUpdate("...")
+      - pattern-not: $S.execute("...")
+  - id: aegis.java.runtime-exec
+    languages: [java]
+    severity: WARNING
+    message: 프로세스 실행 지점입니다. 사용자 입력 도달 여부와 명령 인자 구성을 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-78
+    pattern-either:
+      - pattern: Runtime.getRuntime().exec(...)
+      - pattern: $R.exec($COMMAND, $ENV, $DIR)
+      - pattern: new ProcessBuilder(...)
+  - id: aegis.java.file-from-dynamic-path
+    languages: [java]
+    severity: INFO
+    message: 동적 파일 경로가 사용됩니다. 경로 정규화와 허용 디렉터리 경계를 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-22
+    patterns:
+      - pattern: new java.io.File($PATH)
+      - pattern-not: new java.io.File("...")
+  - id: aegis.java.ldap-dynamic-filter
+    languages: [java]
+    severity: WARNING
+    message: LDAP 검색 필터를 검토해 외부 입력의 적절한 이스케이프를 확인하세요.
+    metadata:
+      category: security
+      cwe: CWE-90
+    patterns:
+      - pattern: $CTX.search($BASE, $FILTER, $CONTROLS)
+      - pattern-not: $CTX.search($BASE, "...", $CONTROLS)
+  - id: aegis.java.weak-hash
+    languages: [java]
+    severity: INFO
+    message: 약한 해시 알고리즘 사용 지점입니다. 보안 용도인지 확인하세요.
+    metadata:
+      category: security
+      cwe: CWE-328
+    pattern-either:
+      - pattern: java.security.MessageDigest.getInstance("MD5")
+      - pattern: java.security.MessageDigest.getInstance("SHA1")
+      - pattern: java.security.MessageDigest.getInstance("SHA-1")

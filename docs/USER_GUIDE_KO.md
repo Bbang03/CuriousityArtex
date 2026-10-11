@@ -2,7 +2,7 @@
 
 AegisLoop는 ARTEX 기반 취약점 진단을 탐지·차단 검증과 로그 기반 침해 조사로 연결합니다.
 
-아래 캡처는 사용자가 직접 진행한 Juice Shop·WAF·Splunk 실습의 저장된 화면입니다. 진단 작업 #4, 취약점 #5, 방어 검증 #2·#3과 해당 로그 조사 기록을 사용했습니다. 화면의 번호는 설치 환경마다 달라집니다.
+취약점·방어·침해 조사 캡처는 사용자가 직접 진행한 Juice Shop·WAF·Splunk 실습 기록입니다. 진단 작업 #4, 취약점 #5, 방어 검증 #2·#3과 해당 로그를 사용했습니다. API·소스 진단 캡처는 별도 crAPI·Benchmark 기능 검증 기록입니다. 화면의 번호는 설치마다 달라지며 저장된 실습 이력은 새 설치에 포함되지 않습니다.
 
 ```text
 진단 → 취약점 확인 → 탐지·차단 확인 → 방어 개선 → 재검증·비교
@@ -16,6 +16,7 @@ AegisLoop는 ARTEX 기반 취약점 진단을 탐지·차단 검증과 로그 �
 | 화면 | 용도 |
 | --- | --- |
 | Offensive → 작업 | 진단 실행과 취약점 확인 |
+| Offensive → API · 소스 코드 진단 | 명세·URL·HAR·소스 ZIP을 등록하고 선택해서 진단 |
 | 취약점 상세 → 방어 검증 | 재현·탐지·차단 결과와 개선 전후 비교 |
 | Defensive → 로그 연결 | Splunk 연결 등록 |
 | Defensive → 경보·침해 조사 | 파일 또는 Splunk 로그로 사건 조사 |
@@ -50,6 +51,49 @@ AegisLoop는 ARTEX 기반 취약점 진단을 탐지·차단 검증과 로그 �
 화면에 요청·응답 PoC가 기록돼 있습니다. 별도로 연결된 트래픽 증거는 0건으로 표시됩니다.
 
 </details>
+
+### API · 소스 코드 진단하기
+
+처음에는 프로젝트 폴더에서 `./scripts/offensive-start.sh`로 진단 실행기와 선택형 실습 환경을 준비합니다. crAPI·Benchmark는 연습용이며, 웹에서 직접 등록한 대상을 사용할 수도 있습니다.
+
+1. **Offensive → API · 소스 코드 진단**을 엽니다.
+2. **API 진단**은 이름·API 기본 주소와 아래 입력 방식을 선택합니다. **소스 코드 진단**은 이름·소스 ZIP을 등록합니다.
+
+   | 방식 | 준비할 것 |
+   |---|---|
+   | OpenAPI 명세 | JSON/YAML 파일, 최대 8 MiB |
+   | URL 탐색 | 웹/API 주소 → **URL에서 API 찾기** |
+   | HAR 업로드 | 브라우저 요청 기록 `.har`/`.json`, 최대 16 MiB |
+   | 소스 코드 | Java·Python·JavaScript·TypeScript 소스 ZIP, 최대 20 MiB |
+
+3. 등록한 대상을 선택합니다. API는 검사할 **GET/HEAD 경로**를 고르고, 인증이 필요하면 이번 검사에 사용할 Bearer 토큰을 별도로 입력합니다.
+4. **API 진단 시작** 또는 **소스 코드 진단 시작**을 누르고 완료 후 요청·응답 또는 파일·줄·규칙 근거를 확인합니다.
+5. 후보의 보안 영향을 더 확인하려면 LLM을 선택해 **ARTEX 심층 검토 시작**으로 이어갑니다.
+
+![명세·URL·HAR 중 입력 방식을 선택하는 실제 화면](evidence/images/offensive-discovery-form-20261011.jpg)
+
+crAPI URL 탐색은 `http://crapi-web:80`으로 시작합니다. HAR를 브라우저의 `http://localhost:18888`에서 기록했다면 **API 기본 주소**는 `http://host.docker.internal:18888`, **HAR 원본 주소**는 `http://localhost:18888`로 입력합니다. 실제 검사는 기본 주소로만 보냅니다.
+
+**결과 읽기:** 명세 방식은 응답 계약도 검사하지만 URL·HAR 방식은 선택한 요청의 서버 오류만 검사합니다. URL 탐색은 전체 API를 찾지 못할 수 있고, 401/403은 인증 제한입니다. 소스 분석도 정적 후보 수집이므로 후보 0건을 안전 판정으로 해석하지 않습니다. 도구 진단에는 LLM이 필요 없으며, 후속 ARTEX 검토에는 설정한 LLM과 사용량이 필요합니다.
+
+<details>
+<summary>URL · HAR · 소스 ZIP 검증 결과 보기</summary>
+
+crAPI URL에서 후보 9개를 발견한 뒤 두 경로를 선택했습니다. 아래 웹 실행은 무인증 401 응답 2건을 확인한 기록입니다.
+
+![URL 탐색 후 선택한 API의 진단 결과](evidence/images/offensive-discovery-url-result-20261011.jpg)
+
+HAR에서도 실제 두 요청을 추출해 같은 인증 제한을 확인했습니다. 원본 HAR의 인증 헤더·쿠키·쿼리값·본문은 자동 재사용하지 않습니다.
+
+![HAR 업로드와 주소 연결 후 진단 결과](evidence/images/offensive-discovery-har-result-20261011.jpg)
+
+Benchmark Java 소스 30파일에서 정적 후보 12건을 수집했습니다. 확정 취약점 수가 아닙니다.
+
+![소스 ZIP 분석 결과와 파일·줄 단위 후보](evidence/images/offensive-upload-source-result-20261011.jpg)
+
+</details>
+
+[입력 파일·실습 준비·지원 범위 상세 안내](offensive-assessments.md) · [실제 URL·HAR 검증 기록](evidence/offensive-api-discovery-validation-2026-10-11.md)
 
 ## 3. 탐지·차단 확인하기
 

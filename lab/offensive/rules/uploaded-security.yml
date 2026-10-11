@@ -1,0 +1,86 @@
+rules:
+  - id: aegis.python.dynamic-code
+    languages: [python]
+    severity: WARNING
+    message: 동적 코드 실행 지점입니다. 외부 입력이 도달하는지와 격리·허용 목록을 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-95
+    pattern-either:
+      - pattern: eval($CODE, ...)
+      - pattern: exec($CODE, ...)
+  - id: aegis.python.shell-command
+    languages: [python]
+    severity: WARNING
+    message: 셸 명령 실행 지점입니다. 사용자 입력과 인자 구성을 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-78
+    pattern-either:
+      - pattern: os.system(...)
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern: subprocess.Popen(..., shell=True, ...)
+      - pattern: subprocess.call(..., shell=True, ...)
+      - pattern: subprocess.check_output(..., shell=True, ...)
+  - id: aegis.python.unsafe-deserialization
+    languages: [python]
+    severity: WARNING
+    message: 역직렬화 입력의 신뢰 경계를 확인하세요. 외부 입력의 실행 가능성은 추가 검토가 필요합니다.
+    metadata:
+      category: security
+      cwe: CWE-502
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: yaml.unsafe_load(...)
+  - id: aegis.python.dynamic-sql
+    languages: [python]
+    severity: WARNING
+    message: SQL에 문자열 조합이 사용됩니다. 외부 입력의 도달과 매개변수화 여부를 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-89
+    pattern-either:
+      - pattern: $DB.execute($SQL + $INPUT, ...)
+      - pattern: $DB.execute($SQL % $INPUT, ...)
+      - pattern: $DB.execute($SQL.format(...), ...)
+  - id: aegis.javascript.dynamic-code
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: 동적 코드 실행 지점입니다. 사용자 입력 도달과 실행 환경을 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-95
+    pattern-either:
+      - pattern: eval($CODE)
+      - pattern: new Function(...)
+  - id: aegis.javascript.shell-command
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: 셸 실행 지점입니다. 사용자 입력 도달과 인자 구성을 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-78
+    pattern-either:
+      - pattern: require('child_process').exec(...)
+      - pattern: require('child_process').execSync(...)
+      - patterns:
+          - pattern-inside: |
+              import { exec } from 'child_process';
+              ...
+          - pattern: exec(...)
+      - patterns:
+          - pattern-inside: |
+              import { execSync } from 'child_process';
+              ...
+          - pattern: execSync(...)
+  - id: aegis.javascript.raw-html
+    languages: [javascript, typescript]
+    severity: INFO
+    message: HTML 삽입 지점입니다. 사용자 입력과 HTML 정화 여부를 검토하세요.
+    metadata:
+      category: security
+      cwe: CWE-79
+    patterns:
+      - pattern: $ELEMENT.innerHTML = $HTML
+      - pattern-not: $ELEMENT.innerHTML = "..."

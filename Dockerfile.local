@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go test -p 4 -c -o /out/securitysource.test ./securitysource && \
     go test -p 4 -c -o /out/db.test ./db && \
     go test -p 4 -c -o /out/server.test ./server
-CMD ["/bin/sh", "-c", "/out/closedloop.test -test.v && /out/defenseeval.test -test.v -test.run '^TestPurple' && /out/investigation.test -test.v && /out/agent.test -test.v -test.run '^TestInvestigator' && /out/securitysource.test -test.v -test.run '^Test(Purple|Investigation|ClosedLoop)' && /out/db.test -test.v -test.run '^Test(Purple|TaskArchive|FindingRetest|Retest|Investigation|Defensive|ClosedLoop|Aegis)' && /out/server.test -test.v -test.run '^Test(Purple|TaskArchive|FindingRetest|Retest|Investigation|Defensive|ClosedLoop|Aegis)'"]
+CMD ["/bin/sh", "-c", "/out/closedloop.test -test.v && /out/defenseeval.test -test.v -test.run '^TestPurple' && /out/investigation.test -test.v && /out/agent.test -test.v -test.run '^TestInvestigator' && /out/securitysource.test -test.v -test.run '^Test(Purple|Investigation|ClosedLoop)' && /out/db.test -test.v -test.run '^Test(Purple|TaskArchive|FindingRetest|Retest|Investigation|Defensive|ClosedLoop|Aegis)' && /out/server.test -test.v -test.run '^Test(Purple|TaskArchive|FindingRetest|Retest|Investigation|Defensive|ClosedLoop|Aegis|Offensive)'"]
 
 FROM go-source AS go-build
 COPY --from=web-build /src/web/out/ ./server/webui/dist/
