@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/splunk/attack_range.git",
+  "commit": "fc9b9e719d8835da0bbb5c20d46c52a9778d64e2",
+  "api_image": "aegis-attack-range-api:fc9b9e719d88",
+  "app_image": "aegis-attack-range-app:fc9b9e719d88",
+  "api_url": "http://127.0.0.1:4000",
+  "app_url": "http://127.0.0.1:4321"
+}

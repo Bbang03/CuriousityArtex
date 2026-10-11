@@ -1,0 +1,120 @@
+# Optional practice environment. The product's default Compose is unchanged.
+name: artex-purple-lab
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:v20.2.0@sha256:8739101ade29358abb5469ee66ae78e582c97ed0a5543a4ad102e5fa5193526b
+    networks: [backend]
+    mem_limit: 768m
+    cpus: 1
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  waf:
+    image: owasp/modsecurity-crs:apache@sha256:497251aeb7bba3711616142af62497736f1f802db7dde2ad3956fdacbbb93879
+    depends_on: [juice-shop]
+    environment:
+      BACKEND: http://juice-shop:3000
+      SERVER_NAME: purple-lab-target
+      PORT: "8080"
+      SSL_ENGINE: "off"
+      PROXY_ERROR_OVERRIDE: "off"
+      MODSEC_RULE_ENGINE: ${LAB_WAF_MODE:-DetectionOnly}
+      MODSEC_AUDIT_ENGINE: "On"
+      MODSEC_AUDIT_LOG: /logs/modsec_audit.log
+      MODSEC_AUDIT_LOG_TYPE: Serial
+      MODSEC_AUDIT_LOG_FORMAT: Native
+      MODSEC_AUDIT_LOG_PARTS: ABFHZ
+      MODSEC_RESP_BODY_ACCESS: "Off"
+      BLOCKING_PARANOIA: "1"
+    ports: ["127.0.0.1:18790:8080"]
+    volumes:
+      - ./lab/purple/waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:ro
+      - ./evidence-local/purple-lab/logs:/logs
+    networks:
+      front:
+        aliases: [purple-lab-target]
+      backend: {}
+    mem_limit: 512m
+    cpus: 1
+    restart: unless-stopped
+
+  splunk:
+    image: splunk/splunk:10.4.3@sha256:cc3a3efe2509fa31f67d4aa20dde7118886babf9a0930f197ef996d513c44834
+    platform: linux/amd64
+    hostname: purple-lab-splunk
+    environment:
+      SPLUNK_PASSWORD: ${LAB_SPLUNK_PASSWORD:?Run scripts/purple-lab.sh init}
+      SPLUNK_START_ARGS: ${LAB_SPLUNK_START_ARGS:?Explicit Splunk license acceptance required}
+      SPLUNK_GENERAL_TERMS: ${LAB_SPLUNK_GENERAL_TERMS:?Explicit Splunk terms acceptance required}
+      # Immutable app defaults are read-only; official Ansible supports opting
+      # out of recursive chown across those mounted files.
+      SPLUNK_HOME_OWNERSHIP_ENFORCEMENT: "false"
+      SPLUNK_ROLE: splunk_standalone
+    ports:
+      - "127.0.0.1:18000:8000"
+      - "127.0.0.1:18089:8089"
+      - "127.0.0.1:18088:8088"
+    volumes:
+      - splunk-etc:/opt/splunk/etc
+      - splunk-var:/opt/splunk/var
+      - ./lab/purple/splunk/default:/opt/splunk/etc/apps/artex_lab/default:ro
+      - ./lab/purple/splunk/metadata/default.meta:/opt/splunk/etc/apps/artex_lab/metadata/default.meta:ro
+    networks:
+      front:
+        aliases: [purple-lab-splunk]
+    mem_limit: 4g
+    cpus: 4
+    restart: unless-stopped
+
+  collector:
+    image: python:3.13-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
+    init: true
+    command: [python, /app/collector.py]
+    environment:
+      LOG_DIR: /logs
+      MODSEC_AUDIT_PATH: /logs/modsec_audit.log
+      TARGET: purple-lab-target:8080
+      SPLUNK_HEC_URL: https://purple-lab-splunk:8088/services/collector/event
+      SPLUNK_HEC_TOKEN_FILE: /run/lab-secrets/hec-token
+      SPLUNK_HEC_PIN_FILE: /run/lab-secrets/splunk-hec.sha256
+      SPLUNK_INDEX: artex_lab
+    volumes:
+      - ./lab/purple/collector:/app:ro
+      - ./evidence-local/purple-lab/logs:/logs
+      - type: bind
+        source: ./.local-runtime/purple-lab/hec-token
+        target: /run/lab-secrets/hec-token
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./.local-runtime/purple-lab/splunk-hec.sha256
+        target: /run/lab-secrets/splunk-hec.sha256
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [front]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, python, /app/collector.py, --health]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+networks:
+  front:
+    name: artex-purple-lab-front
+  backend:
+    internal: true
+
+volumes:
+  splunk-etc:
+  splunk-var:

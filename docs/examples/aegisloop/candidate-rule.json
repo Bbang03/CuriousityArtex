@@ -1,0 +1,7 @@
+{
+  "name": "합성 예제: 비인증 비공개 경로 요청",
+  "any": [{"all": [
+    {"field": "path", "op": "contains", "value": "/private/", "case_sensitive": true},
+    {"field": "auth_state", "op": "equals", "value": "anonymous", "case_sensitive": true}
+  ]}]
+}

@@ -1,0 +1,43 @@
+--2065e364-A--
+[10/Oct/2026:04:46:52.992194 +0000] synthetic-native-id 172.27.0.1 55096 172.27.0.2 8080
+--2065e364-B--
+GET /ftp/acquisitions.md HTTP/1.1
+Accept-Encoding: identity
+Host: 127.0.0.1:18790
+User-Agent: Python-urllib/3.12
+X-Artex-Verification-Id: 36e1c3df-0f65-47cd-a8dc-966b66a05b67
+Connection: close
+
+--2065e364-F--
+HTTP/1.1 200 OK
+X-Frame-Options: SAMEORIGIN
+Access-Control-Allow-Origin: *
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+Feature-Policy: payment 'self'
+X-Recruiting: /#/jobs
+Accept-Ranges: bytes
+Cache-Control: public, max-age=0
+Last-Modified: Mon, 10 Aug 2026 21:36:13 GMT
+ETag: W/"38d-19fed9accc8"
+Content-Type: text/markdown; charset=UTF-8
+Content-Length: 909
+Vary: Accept-Encoding
+Connection: close
+
+--2065e364-H--
+Message: Warning. Pattern match "(?i)^/ftp(?:/|$)" at REQUEST_FILENAME. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf"] [line "8"] [id "1001001"] [msg "ARTEX lab FTP disclosure policy"] [severity "WARNING"] [tag "artex-lab/ftp-disclosure"]
+Message: Warning. Pattern match "(?:^([\\d.]+|\\[[\\da-f:]+\\]|[\\da-f:]+)(:[\\d]+)?$)" at REQUEST_HEADERS:Host. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-920-PROTOCOL-ENFORCEMENT.conf"] [line "773"] [id "920350"] [msg "Host header is a numeric IP address"] [data "127.0.0.1:18790"] [severity "WARNING"] [ver "OWASP_CRS/4.30.0"] [tag "application-multi"] [tag "language-multi"] [tag "platform-multi"] [tag "attack-protocol"] [tag "paranoia-level/1"] [tag "OWASP_CRS"] [tag "OWASP_CRS/PROTOCOL-ENFORCEMENT"] [tag "capec/1000/210/272"]
+Message: Warning. Unconditional match in SecAction. [file "/etc/modsecurity.d/owasp-crs/rules/RESPONSE-980-CORRELATION.conf"] [line "99"] [id "980170"] [msg "Anomaly Scores: (Inbound Scores: blocking=3, detection=3, per_pl=3-0-0-0, threshold=5) - (Outbound Scores: blocking=0, detection=0, per_pl=0-0-0-0, threshold=4) - (SQLI=0, XSS=0, RFI=0, LFI=0, RCE=0, PHPI=0, HTTP=0, SESS=0, COMBINED_SCORE=3)"] [ver "OWASP_CRS/4.30.0"] [tag "reporting"] [tag "OWASP_CRS"]
+Apache-Error: [file "apache2_util.c"] [line 286] [level 3] ModSecurity: Warning. Pattern match "(?i)^/ftp(?:/|$)" at REQUEST_FILENAME. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf"] [line "8"] [id "1001001"] [msg "ARTEX lab FTP disclosure policy"] [severity "WARNING"] [tag "artex-lab/ftp-disclosure"] [hostname "127.0.0.1"] [uri "/ftp/acquisitions.md"] [unique_id "synthetic-native-id"]
+Apache-Error: [file "apache2_util.c"] [line 286] [level 3] ModSecurity: Warning. Pattern match "(?:^([\\\\\\\\d.]+|\\\\\\\\[[\\\\\\\\da-f:]+\\\\\\\\]|[\\\\\\\\da-f:]+)(:[\\\\\\\\d]+)?$)" at REQUEST_HEADERS:Host. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-920-PROTOCOL-ENFORCEMENT.conf"] [line "773"] [id "920350"] [msg "Host header is a numeric IP address"] [data "127.0.0.1:18790"] [severity "WARNING"] [ver "OWASP_CRS/4.30.0"] [tag "application-multi"] [tag "language-multi"] [tag "platform-multi"] [tag "attack-protocol"] [tag "paranoia-level/1"] [tag "OWASP_CRS"] [tag "OWASP_CRS/PROTOCOL-ENFORCEMENT"] [tag "capec/1000/210/272"] [hostname "127.0.0.1"] [uri "/ftp/acquisitions.md"] [unique_id "synthetic-native-id"]
+Apache-Error: [file "apache2_util.c"] [line 286] [level 3] ModSecurity: Warning. Unconditional match in SecAction. [file "/etc/modsecurity.d/owasp-crs/rules/RESPONSE-980-CORRELATION.conf"] [line "99"] [id "980170"] [msg "Anomaly Scores: (Inbound Scores: blocking=3, detection=3, per_pl=3-0-0-0, threshold=5) - (Outbound Scores: blocking=0, detection=0, per_pl=0-0-0-0, threshold=4) - (SQLI=0, XSS=0, RFI=0, LFI=0, RCE=0, PHPI=0, HTTP=0, SESS=0, COMBINED_SCORE=3)"] [ver "OWASP_CRS/4.30.0"] [tag "reporting"] [tag "OWASP_CRS"] [hostname "127.0.0.1"] [uri "/ftp/acquisitions.md"] [unique_id "synthetic-native-id"]
+Apache-Handler: proxy-server
+Stopwatch: 1791607612987228 4977 (- - -)
+Stopwatch2: 1791607612987228 4977; combined=930, p1=286, p2=464, p3=48, p4=78, p5=54, sr=0, sw=0, l=0, gc=0
+Producer: ModSecurity for Apache/2.9.15 (http://www.modsecurity.org/); OWASP_CRS/4.30.0.
+Server: Apache
+Sanitised-Request-Headers: "Authorization", "Cookie".
+Engine-Mode: "DETECTION_ONLY"
+
+--2065e364-Z--

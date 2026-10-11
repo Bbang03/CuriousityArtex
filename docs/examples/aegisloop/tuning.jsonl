@@ -1,0 +1,4 @@
+{"event_id":"tuning-attack-1","label":"attack","fields":{"path":"/private/legacy.csv","auth_state":"anonymous","method":"GET","bytes":100}}
+{"event_id":"tuning-attack-2","label":"attack","fields":{"path":"/private/export.csv","auth_state":"anonymous","method":"GET","bytes":200}}
+{"event_id":"tuning-benign-1","label":"benign","fields":{"path":"/private/legacy.csv","auth_state":"authenticated","method":"GET","bytes":300}}
+{"event_id":"tuning-benign-2","label":"benign","fields":{"path":"/docs/help","auth_state":"anonymous","method":"GET","bytes":400}}

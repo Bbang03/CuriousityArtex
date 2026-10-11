@@ -1,0 +1,80 @@
+# Optional official Attack Range management services, separate from AegisLoop.
+# No cloud credentials or host Docker socket are passed into these containers.
+name: aegis-attack-range
+
+services:
+  api:
+    image: aegis-attack-range-api:fc9b9e719d88
+    build:
+      context: ./.local-runtime/attack-range/upstream
+      dockerfile: api/Dockerfile
+    environment:
+      FLASK_ENV: production
+      FLASK_DEBUG: "0"
+      OBJC_DISABLE_INITIALIZE_FORK_SAFETY: "YES"
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_SHARED_CREDENTIALS_FILE: /root/.aws/credentials
+      AWS_CONFIG_FILE: /root/.aws/config
+      AZURE_CONFIG_DIR: /root/.azure
+      CLOUDSDK_CONFIG: /root/.config/gcloud
+      ATTACK_RANGE_LOCAL_ROLES: ""
+    ports: ["127.0.0.1:4000:4000"]
+    volumes:
+      - ./.local-runtime/attack-range/config:/app/config
+      - ./.local-runtime/attack-range/ssh_keys:/app/ssh_keys
+      - ./.local-runtime/attack-range/wireguard_config:/app/wireguard_config
+      - ./.local-runtime/attack-range/logs:/app/logs
+      - ./.local-runtime/attack-range/cloud-disabled/aws:/root/.aws:ro
+      - ./.local-runtime/attack-range/cloud-disabled/azure:/root/.azure
+      - ./.local-runtime/attack-range/cloud-disabled/gcloud:/root/.config/gcloud
+    networks: [management]
+    labels:
+      org.opencontainers.image.source: https://github.com/splunk/attack_range
+      org.opencontainers.image.revision: fc9b9e719d8835da0bbb5c20d46c52a9778d64e2
+    mem_limit: 1g
+    cpus: 1
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:4000/health', timeout=5); assert r.status == 200"]
+      interval: 15s
+      timeout: 8s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  app:
+    image: aegis-attack-range-app:fc9b9e719d88
+    build:
+      context: ./.local-runtime/attack-range/upstream
+      dockerfile: app/Dockerfile
+    environment:
+      DOCKER: "true"
+      API_URL: http://api:4000
+      PUBLIC_API_URL: http://localhost:4000
+      NODE_OPTIONS: --max-old-space-size=512
+    ports: ["127.0.0.1:4321:4321"]
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [management]
+    labels:
+      org.opencontainers.image.source: https://github.com/splunk/attack_range
+      org.opencontainers.image.revision: fc9b9e719d8835da0bbb5c20d46c52a9778d64e2
+    mem_limit: 512m
+    cpus: 1
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, node, -e, "require('http').get('http://127.0.0.1:4321/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 8s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+networks:
+  management:
+    driver: bridge

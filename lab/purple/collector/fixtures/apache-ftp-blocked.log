@@ -1,0 +1,29 @@
+--233c544b-A--
+[10/Oct/2026:04:51:26.007104 +0000] synthetic-native-id 172.27.0.1 59730 172.27.0.2 8080
+--233c544b-B--
+GET /ftp/acquisitions.md HTTP/1.1
+Accept-Encoding: identity
+Host: purple-lab-target:8080
+User-Agent: ARTEX-local-lab-check
+X-Artex-Verification-Id: 36e1c3df-0f65-47cd-a8dc-966b66a05b67
+Connection: close
+
+--233c544b-F--
+HTTP/1.1 403 Forbidden
+X-Frame-Options: SAMEORIGIN
+Content-Length: 239
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+
+--233c544b-H--
+Message: Access denied with code 403 (phase 1). Pattern match "(?i)^/ftp(?:/|$)" at REQUEST_FILENAME. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf"] [line "8"] [id "1001001"] [msg "ARTEX lab FTP disclosure policy"] [severity "WARNING"] [tag "artex-lab/ftp-disclosure"]
+Apache-Error: [file "apache2_util.c"] [line 286] [level 3] ModSecurity: Access denied with code 403 (phase 1). Pattern match "(?i)^/ftp(?:/|$)" at REQUEST_FILENAME. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf"] [line "8"] [id "1001001"] [msg "ARTEX lab FTP disclosure policy"] [severity "WARNING"] [tag "artex-lab/ftp-disclosure"] [hostname "purple-lab-target"] [uri "/ftp/acquisitions.md"] [unique_id "synthetic-native-id"]
+Action: Intercepted (phase 1)
+Stopwatch: 1791607886006854 263 (- - -)
+Stopwatch2: 1791607886006854 263; combined=82, p1=47, p2=0, p3=0, p4=0, p5=35, sr=0, sw=0, l=0, gc=0
+Producer: ModSecurity for Apache/2.9.15 (http://www.modsecurity.org/); OWASP_CRS/4.30.0.
+Server: Apache
+Sanitised-Request-Headers: "Authorization", "Cookie".
+Engine-Mode: "ENABLED"
+
+--233c544b-Z--

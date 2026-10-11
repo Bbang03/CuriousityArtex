@@ -1,14 +1,14 @@
 <div align="center">
 
-# ARTEX 방어 검증·침해 조사 확장
+# AegisLoop: ARTEX 기반 공격·방어 검증
 
-**발견한 취약점을 방어 검증과 증거 기반 침해 조사로 연결하는 프로젝트**
+**취약점 진단·독립 사건 조사·탐지 규칙 개선 평가를 연결하는 프로젝트**
 
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
 </div>
 
-[ARTEX](https://github.com/Autumn-27/ARTEX)의 [한국어판 artex-ko](https://github.com/jiwoochris/artex-ko)를 기반으로 확장했습니다. 기존 취약점 점검 기능과 Go·Next.js·PostgreSQL 구조를 유지하면서, 점검 이후의 탐지·차단 확인과 CERT 조사 업무를 연결합니다. 원본과 한국어판의 저작권 표시 및 [AGPL-3.0 라이선스](LICENSE)를 유지합니다. 기반 프로젝트의 [중국어 문서](README.zh.md)와 [영문 문서](README.en.md)는 참고용으로 보존하며, 이 확장의 실행 방법은 아래 안내를 따릅니다.
+[ARTEX](https://github.com/Autumn-27/ARTEX)의 [한국어판 artex-ko](https://github.com/jiwoochris/artex-ko)를 기반으로 확장했습니다. 기존 취약점 점검 기능과 Go·Next.js·PostgreSQL 구조를 유지하면서, 점검 이후의 탐지·차단 확인, 취약점 없이 시작하는 사건 조사와 탐지 규칙 개선 평가를 하나의 웹앱으로 연결합니다. 원본과 한국어판의 저작권 표시 및 [AGPL-3.0 라이선스](LICENSE)를 유지합니다. 기반 프로젝트의 [중국어 문서](README.zh.md)와 [영문 문서](README.en.md)는 참고용으로 보존하며, 이 확장의 실행 방법은 아래 안내를 따릅니다.
 
 ## 이 프로젝트에서 할 수 있는 일
 
@@ -17,6 +17,14 @@
 | 취약점 점검 | 기존 ARTEX 에이전트가 허가된 대상을 점검 | 취약점과 재현 근거 |
 | 방어 검증 | 취약점을 재검증하고 해당 실행의 감사·경보 파일 또는 Splunk 결과를 대조 | 탐지·차단 상태, 근거 부족과 확인할 원인, 개선 전후 비교 |
 | 침해 조사 | 파일 또는 Splunk로 과거 로그 근거를 준비한 뒤 AI 조사를 명시적으로 시작 | 가설·로그 조회·원문 확인·후속 계획, 관측/추정/자료 부족, 조사 이력과 원문 내보내기 |
+| 독립 Defensive 사건 | 취약점 없이 대상·기간을 지정하고 파일/Splunk 로그에서 사건 생성 | 불변 로그 근거와 타임라인, 같은 읽기 전용 Planner/Worker 조사 |
+| 실제 실행 루프 | 기존 취약점의 실제 ARTEX 재검증 → 파일/Splunk 근거 수집 → 후보 규칙 저장 → 새 검증 ID로 실제 재실행 | 실행별 기존 경보 판정, 같은 재실행 로그에서 기준·후보 규칙 비교, 규칙 revision·원본 해시·이력 |
+| 선택형 AWS Windows 루프 | PowerShell·예약 작업 체인과 정상 업무 실행 → 다중 로그·실제 경보 분석 → 규칙 개선 → 변형 재실행. 기존 Atomic 탐색도 지원 | 공통 표본의 탐지·오탐 전후 비교, 별도 변형 결과, 단계별 근거와 원본 내보내기 |
+| 로그 규칙 평가 | 개선용·평가용 라벨 로그를 분리하고 기준·후보 규칙을 오프라인 비교 | TP/FP/TN/FN·precision·recall·오탐률, 누락 필드와 평가 이력 |
+
+웹앱 하나에서 **통합 개요 → Offensive / Defensive / Closed-loop**로 업무를 나눕니다. Closed-loop의 기본 **실제 실행 루프** 탭에서 사용자가 기준 공격과 새 재실행을 시작하고 근거를 수집합니다. 기존 **로그 규칙 평가** 탭도 유지합니다. [사용 순서·API·현재 한계](docs/aegisloop.md)와 [소스 분석](docs/aegisloop-source-analysis.md)에서 연결 구조를 확인할 수 있습니다.
+
+**실제 경보와 후보 규칙의 그림자 일치는 별도 결과입니다.** 그림자 평가는 실제 감사 로그에서 조건을 계산하며, SIEM 경보 발화나 정책 배포를 의미하지 않습니다. 실제 루프는 두 공격만으로 정확도·오탐률·MTTD·MTTR을 만들지 않습니다. 운영 SIEM 규칙·차단 정책의 자동 적용은 제공하지 않습니다. 선택형 [AWS Windows 연결](docs/aws-windows-loop.md)은 고정 실습 Splunk의 전용 규칙 실제 적용 경로를 별도로 제공하며, 일반 검색 연결의 권한은 유지합니다.
 
 **Splunk 없이 파일 업로드로 시작할 수 있습니다.** 방어 검증은 재검증 UUID와 실행 시간에 연결된 로그를 사용합니다. 침해 조사는 UUID가 없는 과거 로그도 다루며, 사용자가 지정한 자산·기간·경로 안에서 읽기 전용으로 조사합니다.
 
@@ -59,12 +67,23 @@ docker compose --env-file .env.local -f docker-compose.local.yml stop
 
 ## 사용 안내와 실제 실습 증적
 
+- [2026-10-11 배포 버전과 현재 범위](RELEASE_NOTES.md): 포함 기능, 실제 검증 결과, 새 설치와 GitHub 업로드 안내.
+- [AegisLoop 사용 안내](docs/aegisloop.md): 실제 공격·로그 수집·후보 개선·새 재실행, API와 기존 오프라인 평가.
+- [AegisLoop 화면 검증](docs/evidence/aegisloop-mvp.md): 독립 사건 저장, 합성 규칙 평가와 구현 한계.
+- [실제 소스 분석과 개발 범위](docs/aegisloop-source-analysis.md): 호출 관계, 재사용·확장 지점과 후속 요구사항.
 - [방어 검증](docs/purple-validation.md): 재검증, 파일/Splunk 근거, 판정 의미와 한계.
 - [에이전트 침해 조사](docs/cert-investigation.md): **1. 로그 근거 준비 → 2. AI 조사**, 후속 조회·예산·인용·중지·이력.
 - [로컬 실행과 실습](docs/local-development.md): 초기 설정, 로그 수집과 내보내기, 테스트.
+- [WAF·Splunk 선택형 실습 환경](docs/purple-lab.md): 별도 Juice Shop 대상의 탐지·차단·미탐 비교.
+- [Attack Range 선택형 설치](docs/attack-range.md): 공식 관리 API·웹 UI를 로컬 Docker로 설치하고, Windows/Linux 클라우드 실습 서버 구축과 구분합니다.
+- [AWS Windows 루프 연결](docs/aws-windows-loop.md): 기존 실습 환경을 우리 웹에 연결하는 선택형 브리지, 예약 작업 체인·정상 대조·변형 재검증 및 기존 세 Atomic 시나리오. 공식 4321 관리 화면과 별도입니다.
 - [실제 로컬 화면 증적](docs/evidence/README.md): 취약점·방어 검증·조사 준비·조사 진행 화면과 확인한 범위.
 
 별도 실습 환경에서 확인한 주요 화면입니다. 전체 캡처와 판정 한계는 [증적 안내](docs/evidence/README.md)에 정리했습니다.
+
+**AWS Windows 체인 탐지 개선:** 같은 공격은 개선 전후 모두 탐지됐고 정상 관리 업무 오탐은 1건에서 0건으로 줄었습니다. 개선 후 별도 변형 공격도 탐지됐습니다. [상세 검증 기록](docs/evidence/windows-task-chain-2026-10-11.md)에 제한된 표본과 실제 로그·경보 근거를 정리했습니다.
+
+![AWS 체인 공격과 정상 업무의 실제 탐지 개선 결과](docs/evidence/images/windows-task-chain-comparison-2026-10-11.jpg)
 
 **파일로 방어 검증:** 감사 2건·경보 2건에서 탐지 기록을 확인했지만, 차단 여부는 근거 부족으로 판단 불가입니다.
 
@@ -78,7 +97,7 @@ docker compose --env-file .env.local -f docker-compose.local.yml stop
 
 ![사용자 중지된 AI 조사와 보존된 가설](docs/evidence/images/04-investigation-trace.png)
 
-공개 증적의 Juice Shop은 기능을 확인하기 위해 **별도로 띄운 실습 대상**이며 제품의 설치 구성에 포함되지 않습니다. 운영 DB, 원본 로그, LLM 키, JWT 키는 배포하지 않습니다. 모의 Splunk 테스트는 연결·범위 제한·증거 보존을 검증합니다. **실제 기업 Splunk 연결이나 탐지 정확도를 입증한 것은 아닙니다.** 공개한 실제 AI 조사 이력은 사용자 중지 상태이므로 완주·침해 확정 성공 사례로 제시하지 않습니다.
+공개 증적의 Juice Shop은 기능을 확인하기 위해 **별도로 띄운 실습 대상**이며 제품의 설치 구성에 포함되지 않습니다. AWS 역시 임시 시연·증적을 위한 별도 환경이며 장기 서비스 인프라 구축이 프로젝트의 목표는 아닙니다. 운영 DB, 원본 로그, LLM 키, JWT 키는 배포하지 않습니다. 모의 Splunk 테스트는 연결·범위 제한·증거 보존을 검증합니다. **실제 기업 Splunk 연결이나 탐지 정확도를 입증한 것은 아닙니다.** 공개한 실제 AI 조사 이력은 사용자 중지 상태이므로 완주·침해 확정 성공 사례로 제시하지 않습니다.
 
 ## 기반 프로젝트 문서
 

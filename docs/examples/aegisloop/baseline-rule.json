@@ -1,0 +1,4 @@
+{
+  "name": "합성 예제: 기존 경로만 확인",
+  "any": [{"all": [{"field": "path", "op": "equals", "value": "/private/legacy.csv", "case_sensitive": true}]}]
+}

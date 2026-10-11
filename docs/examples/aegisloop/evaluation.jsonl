@@ -1,0 +1,4 @@
+{"event_id":"evaluation-attack-1","label":"attack","fields":{"path":"/private/legacy.csv","auth_state":"anonymous","method":"HEAD","bytes":111}}
+{"event_id":"evaluation-attack-2","label":"attack","fields":{"path":"/private/recent.csv","auth_state":"anonymous","method":"GET","bytes":211}}
+{"event_id":"evaluation-benign-1","label":"benign","fields":{"path":"/private/legacy.csv","auth_state":"authenticated","method":"HEAD","bytes":311}}
+{"event_id":"evaluation-benign-2","label":"benign","fields":{"path":"/docs/read","auth_state":"anonymous","method":"GET","bytes":411}}

@@ -1,0 +1,34 @@
+--06997566-A--
+[10/Oct/2026:04:51:26.011474 +0000] synthetic-native-id 172.27.0.1 59742 172.27.0.2 8080
+--06997566-B--
+GET /rest/products/search?q=%27%20OR%201%3D1-- HTTP/1.1
+Accept-Encoding: identity
+Host: purple-lab-target:8080
+User-Agent: ARTEX-local-lab-check
+X-Artex-Verification-Id: 36e1c3df-0f65-47cd-a8dc-966b66a05b67
+Connection: close
+
+--06997566-F--
+HTTP/1.1 403 Forbidden
+X-Frame-Options: SAMEORIGIN
+Content-Length: 239
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+
+--06997566-H--
+Message: Warning. detected SQLi using libinjection with fingerprint 's&1c' [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-942-APPLICATION-ATTACK-SQLI.conf"] [line "66"] [id "942100"] [msg "SQL Injection Attack Detected via libinjection"] [data "Matched Data: s&1c found within ARGS:q: ' OR 1=1--"] [severity "CRITICAL"] [ver "OWASP_CRS/4.30.0"] [tag "application-multi"] [tag "language-multi"] [tag "platform-multi"] [tag "attack-sqli"] [tag "paranoia-level/1"] [tag "OWASP_CRS"] [tag "OWASP_CRS/ATTACK-SQLI"] [tag "capec/1000/152/248/66"]
+Message: Access denied with code 403 (phase 2). Operator GE matched 5 at TX:blocking_inbound_anomaly_score. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-949-BLOCKING-EVALUATION.conf"] [line "233"] [id "949110"] [msg "Inbound Anomaly Score Exceeded (Total Score: 5)"] [ver "OWASP_CRS/4.30.0"] [tag "anomaly-evaluation"] [tag "OWASP_CRS"]
+Message: Warning. Unconditional match in SecAction. [file "/etc/modsecurity.d/owasp-crs/rules/RESPONSE-980-CORRELATION.conf"] [line "99"] [id "980170"] [msg "Anomaly Scores: (Inbound Scores: blocking=5, detection=5, per_pl=5-0-0-0, threshold=5) - (Outbound Scores: blocking=0, detection=0, per_pl=0-0-0-0, threshold=4) - (SQLI=5, XSS=0, RFI=0, LFI=0, RCE=0, PHPI=0, HTTP=0, SESS=0, COMBINED_SCORE=5)"] [ver "OWASP_CRS/4.30.0"] [tag "reporting"] [tag "OWASP_CRS"]
+Apache-Error: [file "apache2_util.c"] [line 286] [level 3] ModSecurity: Warning. detected SQLi using libinjection with fingerprint 's&1c' [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-942-APPLICATION-ATTACK-SQLI.conf"] [line "66"] [id "942100"] [msg "SQL Injection Attack Detected via libinjection"] [data "Matched Data: s&1c found within ARGS:q: ' OR 1=1--"] [severity "CRITICAL"] [ver "OWASP_CRS/4.30.0"] [tag "application-multi"] [tag "language-multi"] [tag "platform-multi"] [tag "attack-sqli"] [tag "paranoia-level/1"] [tag "OWASP_CRS"] [tag "OWASP_CRS/ATTACK-SQLI"] [tag "capec/1000/152/248/66"] [hostname "purple-lab-target"] [uri "/rest/products/search"] [unique_id "synthetic-native-id"]
+Apache-Error: [file "apache2_util.c"] [line 286] [level 3] ModSecurity: Access denied with code 403 (phase 2). Operator GE matched 5 at TX:blocking_inbound_anomaly_score. [file "/etc/modsecurity.d/owasp-crs/rules/REQUEST-949-BLOCKING-EVALUATION.conf"] [line "233"] [id "949110"] [msg "Inbound Anomaly Score Exceeded (Total Score: 5)"] [ver "OWASP_CRS/4.30.0"] [tag "anomaly-evaluation"] [tag "OWASP_CRS"] [hostname "purple-lab-target"] [uri "/rest/products/search"] [unique_id "synthetic-native-id"]
+Apache-Error: [file "apache2_util.c"] [line 286] [level 3] ModSecurity: Warning. Unconditional match in SecAction. [file "/etc/modsecurity.d/owasp-crs/rules/RESPONSE-980-CORRELATION.conf"] [line "99"] [id "980170"] [msg "Anomaly Scores: (Inbound Scores: blocking=5, detection=5, per_pl=5-0-0-0, threshold=5) - (Outbound Scores: blocking=0, detection=0, per_pl=0-0-0-0, threshold=4) - (SQLI=5, XSS=0, RFI=0, LFI=0, RCE=0, PHPI=0, HTTP=0, SESS=0, COMBINED_SCORE=5)"] [ver "OWASP_CRS/4.30.0"] [tag "reporting"] [tag "OWASP_CRS"] [hostname "purple-lab-target"] [uri "/rest/products/search"] [unique_id "synthetic-native-id"]
+Action: Intercepted (phase 2)
+Apache-Handler: proxy-server
+Stopwatch: 1791607886009067 2421 (- - -)
+Stopwatch2: 1791607886009067 2421; combined=2094, p1=635, p2=1376, p3=0, p4=0, p5=83, sr=0, sw=0, l=0, gc=0
+Producer: ModSecurity for Apache/2.9.15 (http://www.modsecurity.org/); OWASP_CRS/4.30.0.
+Server: Apache
+Sanitised-Request-Headers: "Authorization", "Cookie".
+Engine-Mode: "ENABLED"
+
+--06997566-Z--

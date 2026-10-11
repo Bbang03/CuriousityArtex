@@ -1,0 +1,51 @@
+# Optional connection to an already provisioned, privately owned Windows range.
+# No cloud API credentials, cloud creation, public ports, or Docker socket.
+services:
+  artex:
+    environment:
+      ARTEX_RANGE_BRIDGE_URL: http://range-bridge:8091
+      ARTEX_RANGE_BRIDGE_TOKEN_FILE: /run/aegis-range/token
+    volumes:
+      - ./.local-runtime/attack-range/bridge/token:/run/aegis-range/token:ro
+    depends_on:
+      range-bridge:
+        condition: service_started
+
+  range-bridge:
+    image: aegis-range-bridge:local
+    build:
+      context: .
+      dockerfile: Dockerfile.range-bridge
+    environment:
+      ARTEX_RANGE_CONFIG: /run/range/config.json
+      ARTEX_RANGE_TOKEN_FILE: /run/range/token
+      ARTEX_RANGE_STATE_DIR: /var/lib/aegis-range
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./.local-runtime/attack-range/bridge/config.json:/run/range/config.json:ro
+      - ./.local-runtime/attack-range/bridge/token:/run/range/token:ro
+      - type: bind
+        source: ${ARTEX_RANGE_SESSION_DIR:?Configure the existing range session}/sshkey
+        target: /run/range/sshkey
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ARTEX_RANGE_SESSION_DIR:?Configure the existing range session}/known_hosts
+        target: /run/range/known_hosts
+        read_only: true
+        bind:
+          create_host_path: false
+      - ./.local-runtime/attack-range/bridge/state:/var/lib/aegis-range
+    init: true
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import socket; socket.create_connection(('127.0.0.1',8091),3).close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
