@@ -1,6 +1,6 @@
 <div align="center">
 
-# AegisLoop: ARTEX 기반 공격·방어 검증
+# AegisLoop v1.1: ARTEX 기반 공격·방어 검증
 
 **취약점 진단·독립 사건 조사·탐지 규칙 개선 평가를 연결하는 프로젝트**
 
