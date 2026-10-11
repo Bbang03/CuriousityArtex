@@ -10,6 +10,8 @@
 
 [ARTEX](https://github.com/Autumn-27/ARTEX)의 [한국어판 artex-ko](https://github.com/jiwoochris/artex-ko)를 기반으로 확장했습니다. 기존 취약점 점검 기능과 Go·Next.js·PostgreSQL 구조를 유지하면서, 점검 이후의 탐지·차단 확인, 취약점 없이 시작하는 사건 조사와 탐지 규칙 개선 평가를 하나의 웹앱으로 연결합니다. 원본과 한국어판의 저작권 표시 및 [AGPL-3.0 라이선스](LICENSE)를 유지합니다. 기반 프로젝트의 [중국어 문서](README.zh.md)와 [영문 문서](README.en.md)는 참고용으로 보존하며, 이 확장의 실행 방법은 아래 안내를 따릅니다.
 
+- [사용 가이드](docs/USER_GUIDE_KO.md): 진단·방어 검증·침해 조사의 핵심 사용 순서.
+
 ## 실제 웹 화면
 
 **2026-10-11 현재 실행 중인 AegisLoop에서 직접 캡처한 화면입니다.** 하나의 웹앱에서 통합 현황, Offensive, Defensive, Closed-loop로 이동합니다. 화면의 저장된 실습 기록은 새 설치에 포함되지 않습니다.
@@ -103,7 +105,6 @@ docker compose --env-file .env.local -f docker-compose.local.yml stop
 - [실제 소스 분석과 개발 범위](docs/aegisloop-source-analysis.md): 호출 관계, 재사용·확장 지점과 후속 요구사항.
 - [방어 검증](docs/purple-validation.md): 재검증, 파일/Splunk 근거, 판정 의미와 한계.
 - [에이전트 침해 조사](docs/cert-investigation.md): **1. 로그 근거 준비 → 2. AI 조사**, 후속 조회·예산·인용·중지·이력.
-- [사용 가이드](docs/USER_GUIDE_KO.md): 진단·방어 검증·침해 조사의 핵심 사용 순서.
 - [로컬 실행과 실습](docs/local-development.md): 초기 설정, 로그 수집과 내보내기, 테스트.
 - [WAF·Splunk 선택형 실습 환경](docs/purple-lab.md): 별도 Juice Shop 대상의 탐지·차단·미탐 비교.
 - [Attack Range 선택형 설치](docs/attack-range.md): 공식 관리 API·웹 UI를 로컬 Docker로 설치하고, Windows/Linux 클라우드 실습 서버 구축과 구분합니다.
