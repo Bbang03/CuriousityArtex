@@ -10,6 +10,36 @@
 
 [ARTEX](https://github.com/Autumn-27/ARTEX)의 [한국어판 artex-ko](https://github.com/jiwoochris/artex-ko)를 기반으로 확장했습니다. 기존 취약점 점검 기능과 Go·Next.js·PostgreSQL 구조를 유지하면서, 점검 이후의 탐지·차단 확인, 취약점 없이 시작하는 사건 조사와 탐지 규칙 개선 평가를 하나의 웹앱으로 연결합니다. 원본과 한국어판의 저작권 표시 및 [AGPL-3.0 라이선스](LICENSE)를 유지합니다. 기반 프로젝트의 [중국어 문서](README.zh.md)와 [영문 문서](README.en.md)는 참고용으로 보존하며, 이 확장의 실행 방법은 아래 안내를 따릅니다.
 
+## 실제 웹 화면
+
+**2026-10-11 현재 실행 중인 AegisLoop에서 직접 캡처한 화면입니다.** 하나의 웹앱에서 통합 현황, Offensive, Defensive, Closed-loop로 이동합니다. 화면의 저장된 실습 기록은 새 설치에 포함되지 않습니다.
+
+### 통합 현황
+
+공격 진단·독립 사건 조사·탐지 개선의 진입점과 저장된 기록을 한 화면에서 확인합니다. 카드의 숫자는 작업·사건·평가 기록 수이며 탐지 성능 지표가 아닙니다.
+
+![AegisLoop 통합 현황: Offensive·Defensive·Closed-loop를 연결하는 최신 웹 화면](docs/evidence/images/aegisloop-overview-2026-10-11.jpg)
+
+### Offensive · 취약점 진단
+
+기존 ARTEX의 작업·자산·취약점·트래픽과 모델 사용 현황을 유지했습니다. 아래는 별도 로컬 실습에서 저장한 진단 이력입니다.
+
+![Offensive 진단 현황: 작업·취약점·자산과 활동 기록](docs/evidence/images/aegisloop-offensive-2026-10-11.jpg)
+
+### Defensive · 로그에서 시작하는 조사
+
+취약점이 없어도 파일 또는 Splunk 로그에서 사건을 시작합니다. **로그 근거 준비 → 사건 저장 → AI 조사 시작 → 근거·실행 기록 확인** 순서이며, 아래는 로그를 준비하는 입력 화면입니다.
+
+![Defensive 경보·침해 조사: 로그 근거부터 준비하는 최신 화면](docs/evidence/images/aegisloop-defensive-2026-10-11.jpg)
+
+### Closed-loop · 실제 탐지 개선과 변형 재검증
+
+별도 **AWS Windows·Splunk 실습**에서 PowerShell → 예약 작업 → 지연 실행을 검증했습니다. 공통 공격은 개선 전후 모두 탐지됐고 **정상 업무 오탐은 1건 → 0건**, 개선 후 별도 변형 공격도 탐지됐습니다. 아래 수치는 제한된 실습 표본의 판정 건수이며 운영 환경 전체의 정확도·오탐률을 의미하지 않습니다.
+
+![Closed-loop 실제 AWS 결과: 공통 공격 탐지 유지·정상 오탐 감소·독립 변형 탐지](docs/evidence/images/aegisloop-closed-loop-2026-10-11.jpg)
+
+[실행·다중 로그·규칙 적용 상세 증적](docs/evidence/windows-task-chain-2026-10-11.md) · [전체 화면과 증적의 범위](docs/evidence/README.md)
+
 ## 이 프로젝트에서 할 수 있는 일
 
 | 단계 | 동작 | 결과 |
@@ -37,7 +67,7 @@ Docker Desktop 또는 Docker Engine과 Compose v2가 필요합니다. 현재 소
 아래 URL을 **이 저장소의 GitHub URL**로 바꿉니다.
 
 ```sh
-git clone https://github.com/bdg9412/artex-ko-plus.git artex-defense
+git clone https://github.com/YOUR_ACCOUNT/YOUR_REPOSITORY.git artex-defense
 cd artex-defense
 ./scripts/local-start.sh
 ```
@@ -79,23 +109,24 @@ docker compose --env-file .env.local -f docker-compose.local.yml stop
 - [AWS Windows 루프 연결](docs/aws-windows-loop.md): 기존 실습 환경을 우리 웹에 연결하는 선택형 브리지, 예약 작업 체인·정상 대조·변형 재검증 및 기존 세 Atomic 시나리오. 공식 4321 관리 화면과 별도입니다.
 - [실제 로컬 화면 증적](docs/evidence/README.md): 취약점·방어 검증·조사 준비·조사 진행 화면과 확인한 범위.
 
-별도 실습 환경에서 확인한 주요 화면입니다. 전체 캡처와 판정 한계는 [증적 안내](docs/evidence/README.md)에 정리했습니다.
+최신 통합 UI와 AWS 전후 비교는 위 [실제 웹 화면](#실제-웹-화면)에서 볼 수 있습니다. 아래는 기능 확장 과정에서 남긴 이전 방어 검증·침해 조사 화면입니다. 전체 캡처와 판정 한계는 [증적 안내](docs/evidence/README.md)에 정리했습니다.
 
-**AWS Windows 체인 탐지 개선:** 같은 공격은 개선 전후 모두 탐지됐고 정상 관리 업무 오탐은 1건에서 0건으로 줄었습니다. 개선 후 별도 변형 공격도 탐지됐습니다. [상세 검증 기록](docs/evidence/windows-task-chain-2026-10-11.md)에 제한된 표본과 실제 로그·경보 근거를 정리했습니다.
-
-![AWS 체인 공격과 정상 업무의 실제 탐지 개선 결과](docs/evidence/images/windows-task-chain-comparison-2026-10-11.jpg)
+<details>
+<summary>이전 방어 검증·침해 조사 화면 보기</summary>
 
 **파일로 방어 검증:** 감사 2건·경보 2건에서 탐지 기록을 확인했지만, 차단 여부는 근거 부족으로 판단 불가입니다.
 
-![파일 근거 기반 방어 검증의 탐지·차단 판정](artex-defense/docs/evidence/images/02-defense-validation.png)
+![파일 근거 기반 방어 검증의 탐지·차단 판정](docs/evidence/images/02-defense-validation.png)
 
 **로그 근거부터 준비:** 파일 또는 Splunk로 대상·기간·경로를 지정하고 저장한 뒤 AI 조사를 시작합니다.
 
-![침해 조사의 로그 근거 준비 화면](artex-defense/docs/evidence/images/03-investigation-setup.png)
+![침해 조사의 로그 근거 준비 화면](docs/evidence/images/03-investigation-setup.png)
 
 **실제 AI 실행 이력:** 모델 호출 2회 뒤 사용자 중지한 실행입니다. 로그 조회는 0회이며, 아래 가설은 분석 완료 결과가 아닙니다.
 
-![사용자 중지된 AI 조사와 보존된 가설](artex-defense/docs/evidence/images/04-investigation-trace.png)
+![사용자 중지된 AI 조사와 보존된 가설](docs/evidence/images/04-investigation-trace.png)
+
+</details>
 
 공개 증적의 Juice Shop은 기능을 확인하기 위해 **별도로 띄운 실습 대상**이며 제품의 설치 구성에 포함되지 않습니다. AWS 역시 임시 시연·증적을 위한 별도 환경이며 장기 서비스 인프라 구축이 프로젝트의 목표는 아닙니다. 운영 DB, 원본 로그, LLM 키, JWT 키는 배포하지 않습니다. 모의 Splunk 테스트는 연결·범위 제한·증거 보존을 검증합니다. **실제 기업 Splunk 연결이나 탐지 정확도를 입증한 것은 아닙니다.** 공개한 실제 AI 조사 이력은 사용자 중지 상태이므로 완주·침해 확정 성공 사례로 제시하지 않습니다.
 
