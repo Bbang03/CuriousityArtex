@@ -1630,3 +1630,11 @@ CREATE TABLE IF NOT EXISTS closed_loop_live_observations (
  UNIQUE(cycle_id,phase,rule_revision,evidence_sha256)
 );
 CREATE INDEX IF NOT EXISTS idx_closed_loop_live_observations_history ON closed_loop_live_observations(cycle_id,id DESC);
+
+-- Bounded, resumable Offensive candidate review; runner scan IDs live outside PG.
+CREATE TABLE IF NOT EXISTS offensive_candidate_reviews (
+    run_id TEXT PRIMARY KEY,
+    document JSONB NOT NULL,
+    owner TEXT NOT NULL DEFAULT '',
+    lease_until TIMESTAMPTZ
+);

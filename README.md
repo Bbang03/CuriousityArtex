@@ -1,6 +1,6 @@
 <div align="center">
 
-# AegisLoop v1.1: ARTEX 기반 공격·방어 검증
+# AegisLoop: ARTEX 기반 공격·방어 검증
 
 **취약점 진단·독립 사건 조사·탐지 규칙 개선 평가를 연결하는 프로젝트**
 
@@ -22,7 +22,7 @@
 
 ### Offensive · 취약점 진단
 
-기존 ARTEX의 작업·자산·취약점·트래픽과 모델 사용 현황을 유지했습니다. **API · 소스 코드 진단**에서는 사용자 API 주소를 탐색하거나 OpenAPI 명세·HAR·소스 ZIP을 등록해 Schemathesis·Semgrep으로 후보·근거를 수집하고 기존 ARTEX 심층 검토로 이어갈 수 있습니다. crAPI·Benchmark도 예제 대상으로 선택할 수 있습니다. 환경 준비와 웹 사용법은 [API · 소스 코드 진단 안내](docs/offensive-assessments.md)를 참고하세요. 아래는 별도 로컬 실습에서 저장한 진단 이력입니다.
+기존 ARTEX의 작업·자산·취약점·트래픽과 모델 사용 현황을 유지했습니다. **API · 소스 코드 진단**에서는 사용자 API 주소를 탐색하거나 OpenAPI 명세·HAR·소스 ZIP을 등록해 Schemathesis·Semgrep으로 후보·근거를 수집하고, 후보별 AI 판정을 저장하며 남은 후보를 이어서 검토할 수 있습니다. crAPI·Benchmark도 예제 대상으로 선택할 수 있습니다. 환경 준비와 웹 사용법은 [API · 소스 코드 진단 안내](docs/offensive-assessments.md)를 참고하세요. 아래는 별도 로컬 실습에서 저장한 진단 이력입니다.
 
 ![Offensive 진단 현황: 작업·취약점·자산과 활동 기록](docs/evidence/images/aegisloop-offensive-2026-10-11.jpg)
 
@@ -52,9 +52,13 @@
 
 </details>
 
-URL·HAR는 요청 목록을 만드는 방식으로, 명세의 응답 계약을 추정하거나 API 전체를 발견하지는 않습니다. 후보는 확정 취약점이 아니며, 필요하면 기존 **ARTEX 심층 검토**로 이어갑니다. 원본 HAR의 인증 헤더·쿠키·쿼리값·본문은 보관하거나 자동 재사용하지 않습니다. crAPI·Benchmark는 선택형 실습 대상으로 기본 설치에 필수는 아닙니다.
+URL·HAR는 요청 목록을 만드는 방식으로, 명세의 응답 계약을 추정하거나 API 전체를 발견하지는 않습니다. 후보는 확정 취약점이 아니며, 필요하면 **후보별 AI 검토 · 이어하기**로 저장된 근거를 검토합니다. 원본 HAR의 인증 헤더·쿠키·쿼리값·본문은 보관하거나 자동 재사용하지 않습니다. crAPI·Benchmark는 선택형 실습 대상으로 기본 설치에 필수는 아닙니다.
 
 [짧은 사용 순서](docs/USER_GUIDE_KO.md#api--소스-코드-진단하기) · [상세 안내](docs/offensive-assessments.md) · [URL·HAR 검증 기록](docs/evidence/offensive-api-discovery-validation-2026-10-11.md) · [명세·소스 ZIP 검증 기록](docs/evidence/offensive-upload-validation-2026-10-11.md)
+
+후보별 검토는 한 건씩 판정을 저장하며 중지·새로고침 후에도 남은 후보를 이어갈 수 있습니다. 실제 crAPI 14건·Benchmark 소스 12건의 판정 저장과 이어하기를 [검증 기록](docs/evidence/offensive-candidate-review-validation-2026-10-11.md)에 남겼습니다. 정적 판정과 실제 재현 성공은 구분합니다.
+
+![실제 API 후보별 판정 저장 완료](docs/evidence/images/offensive-candidate-review-api-20261011.jpg)
 
 ### Defensive · 로그에서 시작하는 조사
 
@@ -75,7 +79,7 @@ URL·HAR는 요청 목록을 만드는 방식으로, 명세의 응답 계약을 
 | 단계 | 동작 | 결과 |
 |---|---|---|
 | 취약점 점검 | 기존 ARTEX 에이전트가 허가된 대상을 점검 | 취약점과 재현 근거 |
-| API·소스 진단 | 명세·URL·HAR 또는 소스 ZIP 등록 → 대상·경로 선택 → Schemathesis·Semgrep 실행 | 요청·응답 또는 파일·줄 단위 후보, 근거·해시, 기존 ARTEX 심층 검토 연결 |
+| API·소스 진단 | 명세·URL·HAR 또는 소스 ZIP 등록 → 대상·경로 선택 → Schemathesis·Semgrep 실행 | 요청·응답 또는 파일·줄 단위 후보, 근거·해시, 후보별 AI 판정 저장·이어하기 |
 | 방어 검증 | 취약점을 재검증하고 해당 실행의 감사·경보 파일 또는 Splunk 결과를 대조 | 탐지·차단 상태, 근거 부족과 확인할 원인, 개선 전후 비교 |
 | 침해 조사 | 파일 또는 Splunk로 과거 로그 근거를 준비한 뒤 AI 조사를 명시적으로 시작 | 가설·로그 조회·원문 확인·후속 계획, 관측/추정/자료 부족, 조사 이력과 원문 내보내기 |
 | 독립 Defensive 사건 | 취약점 없이 대상·기간을 지정하고 파일/Splunk 로그에서 사건 생성 | 불변 로그 근거와 타임라인, 같은 읽기 전용 Planner/Worker 조사 |
@@ -135,7 +139,7 @@ docker compose --env-file .env.local -f docker-compose.local.yml stop
 - [방어 검증](docs/purple-validation.md): 재검증, 파일/Splunk 근거, 판정 의미와 한계.
 - [에이전트 침해 조사](docs/cert-investigation.md): **1. 로그 근거 준비 → 2. AI 조사**, 후속 조회·예산·인용·중지·이력.
 - [사용 가이드](docs/USER_GUIDE_KO.md): 진단·방어 검증·침해 조사의 핵심 사용 순서.
-- [API · 소스 코드 진단](docs/offensive-assessments.md): 명세·URL·HAR·소스 ZIP 등록, 범위 선택과 ARTEX 심층 검토.
+- [API · 소스 코드 진단](docs/offensive-assessments.md): 명세·URL·HAR·소스 ZIP 등록, 범위 선택과 후보별 AI 검토·이어하기.
 - [로컬 실행과 실습](docs/local-development.md): 초기 설정, 로그 수집과 내보내기, 테스트.
 - [WAF·Splunk 선택형 실습 환경](docs/purple-lab.md): 별도 Juice Shop 대상의 탐지·차단·미탐 비교.
 - [Attack Range 선택형 설치](docs/attack-range.md): 공식 관리 API·웹 UI를 로컬 Docker로 설치하고, Windows/Linux 클라우드 실습 서버 구축과 구분합니다.

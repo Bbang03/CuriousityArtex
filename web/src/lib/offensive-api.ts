@@ -84,6 +84,80 @@ export interface AssessmentCatalog {
   message?: string;
 }
 
+export type CandidateReviewStatus =
+  | "queued"
+  | "running"
+  | "partial"
+  | "completed"
+  | "cancelled"
+  | "interrupted"
+  | "error";
+
+export type CandidateResultStatus =
+  | "confirmed_static"
+  | "rejected"
+  | "insufficient_evidence"
+  | "auth_required"
+  | "needs_dynamic_validation";
+
+export interface CandidateReviewResult {
+  candidate_id: string;
+  status: CandidateResultStatus;
+  summary: string;
+  rationale: string;
+  evidence_refs: string[] | null;
+  limitations: string[] | null;
+}
+
+export interface CandidateCheckpoint {
+  id: string;
+  title: string;
+  kind: AssessmentKind;
+  rule_id?: string;
+  file?: string;
+  line?: number;
+  status: "pending" | "running" | "error" | CandidateResultStatus;
+  result?: CandidateReviewResult;
+  attempt_count: number;
+  last_error?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
+export interface CandidateReviewAttempt {
+  id: string;
+  status: CandidateReviewStatus;
+  batch_size: number;
+  profile_id: number;
+  queued_at: string;
+  started_at?: string;
+  finished_at?: string;
+  model_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  model_elapsed_ms: number;
+  active_elapsed_ms: number;
+  queue_wait_ms: number;
+  reason?: string;
+}
+
+export interface CandidateReview {
+  run_id: string;
+  kind: AssessmentKind;
+  evidence_sha256: string;
+  legacy_task_id?: string;
+  status: CandidateReviewStatus;
+  reason: string;
+  created_at: string;
+  updated_at: string;
+  profile_id: number;
+  total: number;
+  reviewed: number;
+  pending: number;
+  candidates: CandidateCheckpoint[];
+  attempts: CandidateReviewAttempt[];
+}
+
 const runPath = (id: string) => `/offensive/runs/${encodeURIComponent(id)}`;
 
 async function uploadTarget(input: {
@@ -138,6 +212,14 @@ export const offensiveApi = {
       method: "POST",
       body: JSON.stringify(profileIds?.length ? { llm_profile_ids: profileIds } : {}),
     }),
+  candidateReview: (id: string) => http<{ review: CandidateReview | null }>(`${runPath(id)}/candidate-review`),
+  startCandidateReview: (id: string, options: { llm_profile_id?: number; batch_size: number }) =>
+    http<{ review: CandidateReview }>(`${runPath(id)}/candidate-review`, {
+      method: "POST",
+      body: JSON.stringify(options),
+    }),
+  cancelCandidateReview: (id: string) =>
+    http<{ review: CandidateReview }>(`${runPath(id)}/candidate-review/cancel`, { method: "POST" }),
   artifact: (id: string, name: string) =>
     http<Blob>(`${runPath(id)}/artifacts/${encodeURIComponent(name)}`, undefined, "blob"),
 };

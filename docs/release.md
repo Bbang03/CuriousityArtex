@@ -2,7 +2,7 @@
 
 배포 단위는 이 저장소의 소스와 문서입니다. 기본 실행은 `Dockerfile.local`에서 소스를 빌드하고 `docker-compose.local.yml`로 **ARTEX와 PostgreSQL**을 시작합니다. 공개되지 않은 상류 ARTEX 이미지, 개발자의 API 키, 기존 운영 DB가 필요하지 않습니다. Juice Shop은 화면 증적을 만들 때 별도로 사용한 실습 대상이며 기본 제품 배포에 포함하지 않습니다.
 
-[사용 가이드](USER_GUIDE_KO.md)에 기존 진단·방어 검증·침해 조사와 새 API·소스 ZIP 진단 캡처를 함께 제공합니다. README에도 명세·URL·HAR 선택 화면과 실제 결과가 표시됩니다. GitHub에는 소스와 `docs/`를 함께 올려야 이미지가 표시됩니다. ZIP만 올리는 대신 압축 안의 소스를 저장소에 반영하고, 커밋·푸시는 저장소 소유자가 진행합니다. 이번 배포의 확인 범위는 [최신 배포 검증 기록](evidence/release-api-discovery-validation-2026-10-11.md)에 있습니다.
+[사용 가이드](USER_GUIDE_KO.md)에 기존 진단·방어 검증·침해 조사와 API·소스 ZIP 진단 캡처를 함께 제공합니다. README에는 명세·URL·HAR 선택 화면, 실제 도구 결과와 후보별 AI 판정·이어하기 캡처가 표시됩니다. GitHub에는 소스와 `docs/`를 함께 올려야 이미지가 표시됩니다. ZIP만 올리는 대신 압축 안의 소스를 저장소에 반영하고, 커밋·푸시는 저장소 소유자가 진행합니다. 이번 `aegisloop-public-20261011-candidate-review` 배포의 포장·새 설치 확인 범위는 [최신 배포 검증 기록](evidence/release-candidate-review-validation-2026-10-11.md)에 기록합니다. 앞선 URL·HAR 배포의 [새 설치 검증 기록](evidence/release-api-discovery-validation-2026-10-11.md)과 구분합니다.
 
 ## 처음 받는 사용자의 실행 순서
 
@@ -16,7 +16,7 @@
 
 현재 UI와 Go 백엔드를 컨테이너 안에서 빌드하므로 호스트 Go·Node.js는 필요하지 않습니다. 최초 빌드는 이미지, 패키지와 브라우저 런타임을 내려받습니다.
 
-[http://localhost:8787/setup/](http://localhost:8787/setup/)에서 본인의 관리자 비밀번호를 설정합니다. 취약점 점검·재검증이나 AI 조사를 실행할 때는 **시스템 → LLM 설정**에서 본인이 사용할 연결을 설정합니다. 초기 실행과 파일 근거 준비에는 모델 키가 필요하지 않습니다. Splunk를 사용할 때만 자신의 검색 계정 또는 토큰으로 연결합니다.
+[http://localhost:8787/setup/](http://localhost:8787/setup/)에서 본인의 관리자 비밀번호를 설정합니다. 취약점 점검·재검증이나 AI 조사를 실행할 때는 **시스템 → LLM 설정**에서 본인이 사용할 연결을 설정합니다. 후보별 AI 검토도 본인의 LLM 연결·호출 한도를 설정한 뒤 검토 화면에서 모델을 선택해야 합니다. 개발자가 검증에 사용한 모델 프로필이나 API 키는 배포하지 않습니다. 초기 실행과 파일 근거 준비에는 모델 키가 필요하지 않습니다. Splunk를 사용할 때만 자신의 검색 계정 또는 토큰으로 연결합니다.
 
 스크립트는 `.env.local`에 임의 DB 비밀번호, `.local-runtime/jwt.key`에 로그인 서명·연결 인증 정보 암호화용 키를 생성합니다. 기존 파일은 유지하며, 기존 키가 비어 있으면 자동 교체하지 않고 복구를 요청합니다. JWT 키는 해당 DB와 함께 로컬에 보존해야 하며 공개 저장소에 포함하지 않습니다.
 
@@ -31,6 +31,12 @@
 ```
 
 이 명령은 Schemathesis·Semgrep 실행기를 빌드하고, 고정 커밋의 공식 실습 소스를 내려받으며, 로컬 인증값을 새로 생성합니다. 배포자의 API 키·토큰·등록 대상·진단 이력은 복사하지 않습니다. `Offensive → API · 소스 코드 진단`에서 자신의 명세/URL/HAR/소스 ZIP이나 설치된 예제를 선택합니다. 자세한 순서는 [API·소스 진단 가이드](offensive-assessments.md)를 참고하세요.
+
+도구 진단 뒤 **3. 후보별 AI 검토 · 이어하기**에서 모델과 한 번에 처리할 후보 수(1~5건)를 선택합니다. 한 후보가 끝날 때마다 판정과 근거를 저장하고 정한 수만큼 처리하면 종료합니다. 중지·시간초과 후에는 완료 결과를 유지한 채 미검토 후보부터 이어갑니다. API 검토는 저장된 요청·응답만 해석하고, 소스 검토는 해시를 확인한 제한된 코드 문맥만 정적으로 해석합니다. 이 단계가 새 요청이나 소스 실행을 수행하지는 않습니다.
+
+새 후보 검토는 전용 프롬프트·결과 검증기를 사용하므로 범용 ARTEX Planner·Worker·Skill 호출을 반복하지 않습니다. `api-assessment`·`source-assessment` Skill은 기존 ARTEX 진단·검토 작업의 지침으로 계속 포함하며, 과거 연결 작업은 웹의 별도 이력 링크로 확인합니다. 모델 호출 실패나 근거 부족을 확정 취약점으로 바꾸어 기록하지 않습니다.
+
+실제 웹에서 API 14/14건(모델 호출 3회), 소스 12/12건(모델 호출 12회)의 판정 저장과 이어하기를 확인했습니다. [후보 검토 검증 기록](evidence/offensive-candidate-review-validation-2026-10-11.md)은 개발 환경의 실제 모델 검증이며, 새 설치 검증과 별도입니다. 이번 후보 검토 개선에서 탐지·Splunk·침해 조사 기능은 변경하지 않았습니다.
 
 기본 설치에 crAPI·Benchmark·Juice Shop·Splunk가 필수인 것은 아닙니다. 현재 제공하는 `offensive-start.sh`는 실행기와 crAPI 예제를 함께 준비하는 선택형 실습 묶음입니다. 이미 이 실습을 실행 중인 컴퓨터에서 두 번째 복사본으로 같은 스크립트를 실행하면 동일한 Compose 프로젝트를 사용하므로, 복사본 검증 시에는 실행기 이미지 빌드와 별도 기본 앱 프로젝트를 이용합니다.
 
@@ -69,14 +75,14 @@ python3 -I scripts/check-doc-links.py
 
 소스 압축이나 공개 커밋에는 `Dockerfile.range-bridge`, `docker-compose.range-bridge.yml`, `lab/attack-range/bridge.py`·`runtime.py`·`chain_runtime.py`와 `requirements-bridge.txt`, 설정·감사 준비 도구, 관련 테스트를 함께 포함합니다. 특히 새 `chain_runtime.py`를 빠뜨리면 선택형 브리지 이미지 빌드가 실패합니다. `git archive HEAD`는 마지막 커밋만 포함하므로 아직 커밋하지 않은 변경·새 파일이 빠집니다. 압축 전에 포함 목록과 파일 내용을 확인합니다. 기존 `build.sh`의 플랫폼별 바이너리 ZIP은 이 Docker 소스 배포본과 다른 산출물입니다.
 
-새 API 진단에는 `Dockerfile.offensive-runner`, Offensive Compose 두 파일, `lab/offensive/` 전체(특히 `api_discovery.py`와 규칙), `scripts/offensive-*.sh`, 서버·웹 코드와 두 진단 Skill을 함께 포함해야 합니다.
+새 API 진단에는 `Dockerfile.offensive-runner`, Offensive Compose 두 파일, `lab/offensive/` 전체(특히 `api_discovery.py`와 규칙), `scripts/offensive-*.sh`, 서버·웹 코드와 두 진단 Skill을 함께 포함해야 합니다. 후보별 AI 검토에는 `offensivereview/`, 후보 근거 준비·실행 제어 서버 코드, `db/offensive_reviews.go`와 `db/schema.sql`의 저장 구조, 관련 테스트·웹 UI도 필요합니다. 스키마는 앱 시작 때 준비하며, 배포자의 실제 판정·검토 이력이나 프로필은 포함하지 않습니다.
 
 ### 배포용 폴더 · ZIP 만들기
 
 Git 체크아웃에서 현재 저장된 소스와 새 파일을 포함해 배포본을 만듭니다.
 
 ```sh
-python3 scripts/package-release.py --name aegisloop-public-20261011-api-discovery
+python3 scripts/package-release.py --name aegisloop-public-20261011-candidate-review
 ```
 
 `release-artifacts/`에 같은 이름의 소스 폴더와 ZIP, ZIP의 SHA-256 파일이 생성됩니다. 소스 폴더의 `SOURCE_MANIFEST.sha256`은 포함된 파일의 해시입니다. 같은 이름이 이미 있으면 덮어쓰지 않습니다. Git 이력과 실행 데이터·실제 환경 파일·키는 제외하며, 추적 파일이라도 제외 경로 규칙을 적용합니다. 이 경로 검사는 소스 안에 잘못 붙여 넣은 비밀값까지 찾아내는 기능은 아니므로 최종 폴더에 별도 비밀 탐지 검사를 실행합니다.

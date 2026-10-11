@@ -63,6 +63,9 @@ func (s *Server) registerOffensiveAssessments(mux *http.ServeMux) {
 		})
 	}
 	mux.HandleFunc("POST /api/offensive/runs/{id}/review", s.reviewOffensiveAssessment)
+	mux.HandleFunc("GET /api/offensive/runs/{id}/candidate-review", s.getOffensiveCandidateReview)
+	mux.HandleFunc("POST /api/offensive/runs/{id}/candidate-review", s.startOffensiveCandidateReview)
+	mux.HandleFunc("POST /api/offensive/runs/{id}/candidate-review/cancel", s.cancelOffensiveCandidateReview)
 	mux.HandleFunc("POST /api/offensive/targets", s.uploadOffensiveTarget)
 }
 

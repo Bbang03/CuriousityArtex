@@ -107,6 +107,9 @@ type Server struct {
 	engine *Engine
 	ctx    context.Context
 
+	offensiveReviewInitMu  sync.Mutex
+	offensiveReviewRuntime *offensiveReviewRuntime
+
 	skillDir string // root directory for skill subdirectories
 	jwtKey   []byte // HS256 signing key loaded from / generated into dataDir/jwt.key
 

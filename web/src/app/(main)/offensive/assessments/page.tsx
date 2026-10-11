@@ -14,6 +14,7 @@ import {
   LoaderCircleIcon,
   PlayIcon,
   RefreshCwIcon,
+  SquareIcon,
   UploadIcon,
 } from "lucide-react";
 
@@ -32,6 +33,9 @@ import {
   type AssessmentRun,
   type AssessmentStatus,
   type AssessmentTarget,
+  type CandidateCheckpoint,
+  type CandidateReview,
+  type CandidateReviewStatus,
   offensiveApi,
 } from "@/lib/offensive-api";
 import type { LLMProfile } from "@/lib/types";
@@ -43,6 +47,25 @@ const STATUS: Record<AssessmentStatus, string> = {
   completed: "도구 진단 완료",
   failed: "진단 실패",
   interrupted: "진단 중단",
+};
+const REVIEW_STATUS: Record<CandidateReviewStatus, string> = {
+  queued: "검토 대기 중",
+  running: "AI 검토 중",
+  partial: "일부 검토 완료",
+  completed: "후보 검토 완료",
+  cancelled: "검토 중지됨",
+  interrupted: "검토 중단됨",
+  error: "검토 오류",
+};
+const CANDIDATE_STATUS: Record<CandidateCheckpoint["status"], string> = {
+  pending: "미검토",
+  running: "검토 중",
+  error: "재시도 필요",
+  confirmed_static: "정적 근거 확인",
+  rejected: "후보 기각",
+  insufficient_evidence: "근거 부족",
+  auth_required: "인증 필요",
+  needs_dynamic_validation: "동적 검증 필요",
 };
 const KINDS: Record<AssessmentKind, { title: string; tool: string; description: string }> = {
   api: {
@@ -57,6 +80,7 @@ const KINDS: Record<AssessmentKind, { title: string; tool: string; description: 
   },
 };
 const MAX_OPERATIONS = 40;
+const REVIEW_PROFILE_STORAGE_KEY = "offensive_candidate_review_profile_id";
 const INPUT_MODES: Record<ApiInputMode, { title: string; description: string; addressLabel: string }> = {
   openapi: {
     title: "OpenAPI 명세",
@@ -141,6 +165,92 @@ function isActive(run: AssessmentRun) {
   return run.status === "queued" || run.status === "running";
 }
 
+function isReviewActive(review: CandidateReview | null) {
+  return review?.status === "queued" || review?.status === "running";
+}
+
+function formatDuration(milliseconds: number) {
+  if (milliseconds < 1000) return milliseconds > 0 ? "1초 미만" : "0초";
+  const seconds = Math.round(milliseconds / 1000);
+  return seconds < 60 ? `${seconds}초` : `${Math.floor(seconds / 60)}분 ${seconds % 60}초`;
+}
+
+function CandidateReviewCard({ candidate }: { candidate: CandidateCheckpoint }) {
+  const result = candidate.result;
+  return (
+    <details className="rounded-lg border p-3">
+      <summary className="cursor-pointer text-sm">
+        <span className="mr-2 inline-flex items-center gap-1">
+          <Badge variant={candidate.status === "error" ? "destructive" : "secondary"}>
+            {candidate.status === "running" && <LoaderCircleIcon className="mr-1 size-3 animate-spin" />}
+            {CANDIDATE_STATUS[candidate.status] ?? candidate.status}
+          </Badge>
+        </span>
+        <span className="font-medium">{candidate.title}</span>
+        {result && candidate.attempt_count === 0 && (
+          <Badge variant="outline" className="ml-2">
+            근거 자동 분류
+          </Badge>
+        )}
+        {candidate.file && (
+          <span className="mt-1 block break-all font-mono text-muted-foreground text-xs">
+            {candidate.file}
+            {candidate.line ? `:${candidate.line}` : ""}
+          </span>
+        )}
+        {result?.summary && <span className="mt-2 block whitespace-pre-wrap break-words">{result.summary}</span>}
+      </summary>
+      <div className="mt-3 space-y-3 text-sm">
+        <p className="break-all text-muted-foreground text-xs">후보 ID: {candidate.id}</p>
+        {result && (
+          <>
+            <div>
+              <p className="font-medium">판정 근거</p>
+              <p className="mt-1 whitespace-pre-wrap break-words">{result.rationale}</p>
+            </div>
+            {!!result.evidence_refs?.length && (
+              <div>
+                <p className="font-medium">인용한 근거</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 font-mono text-xs">
+                  {[...new Set(result.evidence_refs)].map((reference) => (
+                    <li key={reference} className="break-all">
+                      {reference}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!!result.limitations?.length && (
+              <div>
+                <p className="font-medium">추가 확인 · 판단 한계</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground text-xs">
+                  {[...new Set(result.limitations)].map((limitation) => (
+                    <li key={limitation}>{limitation}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+        {candidate.last_error && (
+          <p className="whitespace-pre-wrap break-words text-destructive text-xs">{candidate.last_error}</p>
+        )}
+        {!result && !candidate.last_error && (
+          <p className="text-muted-foreground text-xs">
+            {candidate.status === "running"
+              ? "이 후보의 근거를 검토하고 있습니다. 판정이 끝나면 바로 저장됩니다."
+              : "다음 검토에서 처리할 후보입니다."}
+          </p>
+        )}
+        <p className="text-muted-foreground text-xs">
+          검토 시도 {candidate.attempt_count}회
+          {candidate.finished_at ? ` · 저장 ${formatTime(candidate.finished_at)}` : ""}
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function formatTime(value?: string) {
   if (!value) return "—";
   const date = new Date(value);
@@ -176,6 +286,12 @@ export default function OffensiveAssessmentsPage() {
   const [loading, setLoading] = React.useState(true);
   const [starting, setStarting] = React.useState(false);
   const [reviewing, setReviewing] = React.useState(false);
+  const [candidateReview, setCandidateReview] = React.useState<CandidateReview | null>(null);
+  const [reviewLoading, setReviewLoading] = React.useState(false);
+  const [reviewError, setReviewError] = React.useState("");
+  const [reviewRefresh, setReviewRefresh] = React.useState(0);
+  const [batchSize, setBatchSize] = React.useState(3);
+  const [cancellingReview, setCancellingReview] = React.useState(false);
   const [downloading, setDownloading] = React.useState("");
   const [openingId, setOpeningId] = React.useState("");
   const [error, setError] = React.useState("");
@@ -195,7 +311,13 @@ export default function OffensiveAssessmentsPage() {
   const uploadFileRef = React.useRef<HTMLInputElement>(null);
   const selectionSeq = React.useRef(0);
   const refreshSeq = React.useRef(0);
+  const reviewSeq = React.useRef(0);
+  const profileHydrated = React.useRef(false);
+  const profileManuallyChosen = React.useRef(false);
+  const selectedRunRef = React.useRef<string | undefined>(undefined);
+  selectedRunRef.current = selected?.id;
   const profileSelectId = React.useId();
+  const batchSelectId = React.useId();
   const targetSelectId = React.useId();
   const uploadNameId = React.useId();
   const baseUrlId = React.useId();
@@ -223,6 +345,7 @@ export default function OffensiveAssessmentsPage() {
       setSelected((previous) =>
         previous ? (history.find((run) => run.id === previous.id) ?? previous) : (history[0] ?? null),
       );
+      setReviewRefresh((value) => value + 1);
     } else {
       setError(errorText(historyResult.reason));
     }
@@ -235,8 +358,23 @@ export default function OffensiveAssessmentsPage() {
     return () => {
       refreshSeq.current += 1;
       selectionSeq.current += 1;
+      reviewSeq.current += 1;
     };
   }, [refresh]);
+
+  React.useEffect(() => {
+    if (profileHydrated.current || !profiles.length) return;
+    profileHydrated.current = true;
+    try {
+      const saved = localStorage.getItem(REVIEW_PROFILE_STORAGE_KEY);
+      if (saved && profiles.some((profile) => String(profile.id) === saved)) {
+        profileManuallyChosen.current = true;
+        setProfileId(saved);
+      }
+    } catch {
+      // Browsers that disable local storage can still select a model for this page.
+    }
+  }, [profiles]);
 
   const active = runs.some(isActive) || (selected ? isActive(selected) : false);
   React.useEffect(() => {
@@ -275,6 +413,43 @@ export default function OffensiveAssessmentsPage() {
     };
   }, [active, selected?.id]);
 
+  const selectedRunId = selected?.id;
+  const selectedRunStatus = selected?.status;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Restart polling after a mutation or an explicit refresh.
+  React.useEffect(() => {
+    const seq = ++reviewSeq.current;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setCandidateReview((previous) => (previous?.run_id === selectedRunId ? previous : null));
+    if (!profileManuallyChosen.current) setProfileId("");
+    setReviewError("");
+    setReviewLoading(!!selectedRunId && selectedRunStatus === "completed");
+    if (!selectedRunId || selectedRunStatus !== "completed") return;
+    const loadReview = async () => {
+      try {
+        const result = await offensiveApi.candidateReview(selectedRunId);
+        if (!alive || seq !== reviewSeq.current || selectedRunRef.current !== selectedRunId) return;
+        setCandidateReview(result.review);
+        if (!profileManuallyChosen.current && result.review?.profile_id) {
+          setProfileId(String(result.review.profile_id));
+        }
+        setReviewError("");
+        if (isReviewActive(result.review)) timer = setTimeout(() => void loadReview(), 2000);
+      } catch (cause) {
+        if (!alive || seq !== reviewSeq.current || selectedRunRef.current !== selectedRunId) return;
+        setReviewError(`AI 검토 상태를 불러오지 못했습니다: ${errorText(cause)}`);
+        timer = setTimeout(() => void loadReview(), 5000);
+      } finally {
+        if (alive && seq === reviewSeq.current) setReviewLoading(false);
+      }
+    };
+    void loadReview();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [selectedRunId, selectedRunStatus, reviewRefresh]);
+
   const targets = React.useMemo(() => (catalog?.targets ?? []).filter((item) => item.kind === kind), [catalog, kind]);
   const target = targets.find((item) => item.id === targetId);
   const operations = allowedOperations(target);
@@ -303,6 +478,25 @@ export default function OffensiveAssessmentsPage() {
   const candidates = selected?.candidates ?? [];
   const artifacts = selected?.artifacts ?? [];
   const selectedDiscoveredApi = isDiscoveredApi(selected?.target_snapshot);
+  const selectedReview = candidateReview?.run_id === selected?.id ? candidateReview : null;
+  const reviewActive = isReviewActive(selectedReview);
+  const reviewBusy = reviewing || cancellingReview || reviewLoading || reviewActive;
+  const reviewProfile = selectedReview
+    ? profiles.find((profile) => Number(profile.id) === selectedReview.profile_id)
+    : undefined;
+  const selectedProfile = profileId
+    ? profiles.find((profile) => String(profile.id) === profileId)
+    : (reviewProfile ?? profiles.find((profile) => profile.is_default));
+  const lastAttempt = selectedReview?.attempts?.at(-1);
+  const pendingCandidates = selectedReview?.pending ?? candidates.length;
+  const legacyTaskId = selectedReview?.legacy_task_id || selected?.task_id;
+  const reviewProgress = selectedReview?.total
+    ? selectedReview.reviewed
+    : Number(selectedReview?.status === "completed");
+  let reviewActionLabel = "후보 AI 검토 시작";
+  if (selectedReview) reviewActionLabel = `남은 후보 ${Math.min(batchSize, pendingCandidates)}건 이어서 검토`;
+  if (reviewActive) reviewActionLabel = "후보 검토 진행 중";
+  if (reviewing) reviewActionLabel = "검토 시작 중…";
 
   const changeKind = (next: AssessmentKind) => {
     if (next === kind) return;
@@ -440,19 +634,48 @@ export default function OffensiveAssessmentsPage() {
   };
 
   const review = async () => {
-    if (!selected || reviewing) return;
+    if (!selected || reviewBusy || selected.status !== "completed") return;
     const id = selected.id;
+    const persistProfileChoice = profileManuallyChosen.current;
+    const seq = ++reviewSeq.current;
     setReviewing(true);
     setError("");
     try {
-      const result = await offensiveApi.review(id, profileId ? [Number(profileId)] : undefined);
-      const run = { ...result.run, task_id: result.task_id };
-      setSelected((previous) => (previous?.id === id ? run : previous));
-      setRuns((previous) => previous.map((item) => (item.id === id ? run : item)));
+      const result = await offensiveApi.startCandidateReview(id, {
+        llm_profile_id: profileId ? Number(profileId) : undefined,
+        batch_size: batchSize,
+      });
+      if (persistProfileChoice) {
+        try {
+          if (profileId) localStorage.setItem(REVIEW_PROFILE_STORAGE_KEY, profileId);
+          else localStorage.removeItem(REVIEW_PROFILE_STORAGE_KEY);
+        } catch {
+          // Saving the optional preference must not fail a started review.
+        }
+      }
+      if (seq === reviewSeq.current && selectedRunRef.current === id) setCandidateReview(result.review);
     } catch (cause) {
-      setError(errorText(cause));
+      if (seq === reviewSeq.current && selectedRunRef.current === id) setError(errorText(cause));
     } finally {
       setReviewing(false);
+      if (selectedRunRef.current === id) setReviewRefresh((value) => value + 1);
+    }
+  };
+
+  const cancelReview = async () => {
+    if (!selected || !reviewActive || cancellingReview || reviewing) return;
+    const id = selected.id;
+    const seq = ++reviewSeq.current;
+    setCancellingReview(true);
+    setError("");
+    try {
+      const result = await offensiveApi.cancelCandidateReview(id);
+      if (seq === reviewSeq.current && selectedRunRef.current === id) setCandidateReview(result.review);
+    } catch (cause) {
+      if (seq === reviewSeq.current && selectedRunRef.current === id) setError(errorText(cause));
+    } finally {
+      setCancellingReview(false);
+      if (selectedRunRef.current === id) setReviewRefresh((value) => value + 1);
     }
   };
 
@@ -487,7 +710,7 @@ export default function OffensiveAssessmentsPage() {
             <ArrowLeftIcon className="size-3" /> 진단 개요
           </Link>
           <h1 className="font-semibold text-xl tracking-tight">API · 소스 코드 진단</h1>
-          <p className="text-muted-foreground text-sm">대상 등록·선택 → 도구 진단 → 근거 확인 → ARTEX 심층 검토</p>
+          <p className="text-muted-foreground text-sm">대상 등록·선택 → 도구 진단 → 후보별 AI 검토 → 저장·이어하기</p>
         </div>
         <Button variant="outline" size="sm" disabled={loading || uploading || starting} onClick={() => void refresh()}>
           <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} /> 새로고침
@@ -1036,7 +1259,7 @@ export default function OffensiveAssessmentsPage() {
                             )}
                           </summary>
                           <div className="mt-3 space-y-2 text-sm">
-                            <Badge variant="outline">검토 전 후보</Badge>
+                            <Badge variant="outline">도구 원본 후보</Badge>
                             {candidate.rule_id && (
                               <p className="break-all text-muted-foreground text-xs">규칙: {candidate.rule_id}</p>
                             )}
@@ -1105,67 +1328,254 @@ export default function OffensiveAssessmentsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">3. ARTEX 심층 검토</CardTitle>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-base">3. 후보별 AI 검토 · 이어하기</CardTitle>
+                    {selectedReview && (
+                      <Badge variant={selectedReview.status === "error" ? "destructive" : "secondary"}>
+                        {reviewActive && <LoaderCircleIcon className="mr-1 size-3 animate-spin" />}
+                        {REVIEW_STATUS[selectedReview.status] ?? selectedReview.status}
+                      </Badge>
+                    )}
+                  </div>
                   <CardDescription>
-                    기존 Planner·Worker가 진단 Skill과 수집한 근거를 바탕으로 후보를 검토합니다.
+                    후보를 정해진 수만큼 검토하고 하나씩 저장합니다. 다음 검토는 미검토·오류 후보부터 이어갑니다.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {selected.task_id ? (
-                    <div className="space-y-3">
-                      <p className="text-sm">
-                        ARTEX 검토 작업이 연결되었습니다. 진행 과정과 최종 판정은 작업 화면에서 확인하세요.
-                      </p>
-                      <Button asChild>
-                        <Link href={`/function/tasks/detail?id=${encodeURIComponent(selected.task_id)}`}>
-                          ARTEX 검토 작업 열기 <ArrowUpRightIcon className="size-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="max-w-lg space-y-2">
-                        <Label htmlFor={profileSelectId}>검토 모델</Label>
-                        <select
-                          id={profileSelectId}
-                          value={profileId}
-                          onChange={(event) => setProfileId(event.target.value)}
-                          disabled={reviewing}
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  <p className="text-muted-foreground text-xs">
+                    {selected.kind === "source"
+                      ? "저장된 소스와 정적 분석 근거를 검토합니다. ‘정적 근거 확인’은 실제 실행을 통한 취약점 재현과 구분됩니다."
+                      : "저장된 API 요청·응답 근거를 검토합니다. 이 단계에서는 새 HTTP 요청을 보내거나 취약점을 재현하지 않습니다."}{" "}
+                    판정은 이 화면에 저장되며 취약점으로 자동 확정·등록하지 않습니다.
+                  </p>
+                  {reviewError && (
+                    <Alert variant="destructive">
+                      <AlertDescription role="alert">
+                        <p>{reviewError}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => setReviewRefresh((value) => value + 1)}
                         >
-                          <option value="">시스템 기본 LLM 설정</option>
-                          {profiles.map((profile) => (
-                            <option key={profile.id} value={profile.id}>
-                              {profile.name} · {profile.model}
-                              {profile.is_default ? " (기본)" : ""}
-                            </option>
-                          ))}
-                        </select>
-                        <Link
-                          href="/system/llm/"
-                          className="inline-block text-primary text-xs underline underline-offset-4"
-                        >
-                          LLM 연결 설정
-                        </Link>
+                          <RefreshCwIcon className="size-3" /> 상태 다시 불러오기
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {reviewLoading && (
+                    <p role="status" className="flex items-center gap-2 text-muted-foreground text-xs">
+                      <LoaderCircleIcon className="size-3 animate-spin" /> 저장된 후보 검토를 불러오는 중…
+                    </p>
+                  )}
+                  {selectedReview && (
+                    <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                      <div aria-live="polite" className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium text-sm">
+                          저장된 판정 {selectedReview.reviewed} / {selectedReview.total}건
+                        </p>
+                        <p className="text-muted-foreground text-xs">남은 후보 {selectedReview.pending}건</p>
                       </div>
-                      <p className="text-muted-foreground text-xs">
-                        AI 검토를 시작하면 진단 근거와 필요한 소스·응답 내용이 선택한 LLM으로 전송되며 모델 사용량이
-                        발생합니다.
-                      </p>
-                      <Button disabled={selected.status !== "completed" || reviewing} onClick={() => void review()}>
-                        {reviewing ? (
-                          <LoaderCircleIcon className="size-4 animate-spin" />
-                        ) : (
-                          <FileSearchIcon className="size-4" />
-                        )}
-                        {reviewing ? "검토 작업 만드는 중…" : "ARTEX 심층 검토 시작"}
-                      </Button>
-                      {selected.status !== "completed" && (
+                      <progress
+                        aria-label="후보 검토 완료 비율"
+                        max={selectedReview.total || 1}
+                        value={reviewProgress}
+                        className="h-2 w-full accent-primary"
+                      />
+                      {selectedReview.reason && (
+                        <p className="whitespace-pre-wrap break-words text-sm">{selectedReview.reason}</p>
+                      )}
+                      {reviewProfile && (
                         <p className="text-muted-foreground text-xs">
-                          도구 진단이 정상 완료된 실행에서 시작할 수 있습니다.
+                          최근 검토 모델: {reviewProfile.name} · {reviewProfile.model}
                         </p>
                       )}
+                      <p className="text-muted-foreground text-xs">
+                        마지막 저장: {formatTime(selectedReview.updated_at)}
+                      </p>
+                      {lastAttempt && (
+                        <dl className="grid gap-2 text-xs sm:grid-cols-3">
+                          <div>
+                            <dt className="text-muted-foreground">이번 모델 호출·대기</dt>
+                            <dd className="mt-1">
+                              {lastAttempt.model_calls}회 · {formatDuration(lastAttempt.model_elapsed_ms)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">검토 큐 대기</dt>
+                            <dd className="mt-1">{formatDuration(lastAttempt.queue_wait_ms)}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">이번 검토 시간</dt>
+                            <dd className="mt-1">
+                              {formatDuration(Math.max(0, lastAttempt.active_elapsed_ms, lastAttempt.model_elapsed_ms))}
+                            </dd>
+                          </div>
+                        </dl>
+                      )}
+                      <p className="text-muted-foreground text-xs">
+                        ‘인증 필요’·‘근거 부족’도 저장된 판정에 포함됩니다. 중지·시간초과 뒤에도 완료된 판정은
+                        유지됩니다.
+                      </p>
+                    </div>
+                  )}
+                  {selectedReview?.status !== "completed" && (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px]">
+                        <div className="space-y-2">
+                          <Label htmlFor={profileSelectId}>검토 모델</Label>
+                          <select
+                            id={profileSelectId}
+                            value={profileId}
+                            onChange={(event) => {
+                              profileManuallyChosen.current = true;
+                              setProfileId(event.target.value);
+                            }}
+                            disabled={reviewBusy}
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="">
+                              {selectedReview ? "이전 검토 모델 설정 사용" : "시스템 기본 LLM 설정"}
+                            </option>
+                            {profiles.map((profile) => (
+                              <option key={profile.id} value={profile.id}>
+                                {profile.name} · {profile.model}
+                                {profile.is_default ? " (기본)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={batchSelectId}>한 번에 검토할 후보</Label>
+                          <select
+                            id={batchSelectId}
+                            value={batchSize}
+                            onChange={(event) => setBatchSize(Number(event.target.value))}
+                            disabled={reviewBusy}
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          >
+                            {[1, 2, 3, 4, 5].map((size) => (
+                              <option key={size} value={size}>
+                                {size}건
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {selectedProfile && (
+                        <div className="space-y-1 text-muted-foreground text-xs">
+                          <p>
+                            선택 모델 호출 제한:{" "}
+                            {selectedProfile.rate_per_minute > 0
+                              ? `분당 ${selectedProfile.rate_per_minute}회`
+                              : "분당 제한 미설정"}
+                            {selectedProfile.rate_per_second > 0 ? ` · 초당 ${selectedProfile.rate_per_second}회` : ""}
+                          </p>
+                          {selectedProfile.rate_per_minute === 1 && (
+                            <p className="text-amber-700 dark:text-amber-400">
+                              분당 1회 설정은 후보마다 대기를 늘릴 수 있습니다. 빠른 검토용 프로필을 선택하거나 공급자
+                              한도에 맞게 설정하세요.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <Link
+                        href="/system/llm/"
+                        className="inline-block text-primary text-xs underline underline-offset-4"
+                      >
+                        LLM 연결 · 호출 제한 설정
+                      </Link>
+                      <p className="text-muted-foreground text-xs">
+                        AI 검토 시 진단 근거와 필요한 소스·응답 내용이 선택한 LLM으로 전송되며 모델 사용량이 발생합니다.
+                        설정한 후보 수를 처리하면 종료하며 후속 공격·조사를 자동 생성하지 않습니다.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          disabled={selected.status !== "completed" || reviewBusy || !!reviewError}
+                          onClick={() => void review()}
+                        >
+                          {reviewing || reviewActive ? (
+                            <LoaderCircleIcon className="size-4 animate-spin" />
+                          ) : (
+                            <FileSearchIcon className="size-4" />
+                          )}
+                          {reviewActionLabel}
+                        </Button>
+                        {reviewActive && (
+                          <Button
+                            variant="outline"
+                            disabled={cancellingReview || reviewing}
+                            onClick={() => void cancelReview()}
+                          >
+                            {cancellingReview ? (
+                              <LoaderCircleIcon className="size-4 animate-spin" />
+                            ) : (
+                              <SquareIcon className="size-3" />
+                            )}
+                            {cancellingReview ? "중지 요청 중…" : "검토 중지"}
+                          </Button>
+                        )}
+                      </div>
                     </>
+                  )}
+                  {selected.status !== "completed" && (
+                    <p className="text-muted-foreground text-xs">
+                      도구 진단이 정상 완료된 실행에서 AI 검토를 시작할 수 있습니다.
+                    </p>
+                  )}
+                  {selected.status === "completed" && !candidates.length && (
+                    <p className="text-muted-foreground text-xs">
+                      발견 후보가 없어 모델 호출이 필요하지 않습니다. 후보가 없다는 결과는 취약점 부재를 보증하지
+                      않습니다.
+                    </p>
+                  )}
+                  {!!selectedReview?.candidates?.length && (
+                    <div className="space-y-2">
+                      <p className="font-medium text-sm">후보별 저장 결과</p>
+                      {selectedReview.candidates.map((candidate) => (
+                        <CandidateReviewCard key={candidate.id} candidate={candidate} />
+                      ))}
+                    </div>
+                  )}
+                  {!!selectedReview?.attempts?.length && (
+                    <details className="rounded-md border p-3">
+                      <summary className="cursor-pointer text-sm">
+                        검토 · 이어하기 이력 {selectedReview.attempts.length}회
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        {[...selectedReview.attempts].reverse().map((attempt) => (
+                          <div key={attempt.id} className="space-y-1 border-b pb-3 text-xs last:border-0 last:pb-0">
+                            <p className="font-medium">
+                              {formatTime(attempt.queued_at)} · {REVIEW_STATUS[attempt.status] ?? attempt.status}
+                            </p>
+                            <p className="text-muted-foreground">
+                              최대 {attempt.batch_size}건 · 모델 {attempt.model_calls}회 · 입력{" "}
+                              {attempt.input_tokens.toLocaleString()} / 출력 {attempt.output_tokens.toLocaleString()}{" "}
+                              토큰
+                            </p>
+                            <p className="text-muted-foreground">
+                              큐 대기 {formatDuration(attempt.queue_wait_ms)} · 모델 호출·대기{" "}
+                              {formatDuration(attempt.model_elapsed_ms)} · 검토 실행{" "}
+                              {formatDuration(Math.max(0, attempt.active_elapsed_ms, attempt.model_elapsed_ms))}
+                            </p>
+                            {attempt.reason && <p className="whitespace-pre-wrap break-words">{attempt.reason}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  {legacyTaskId && (
+                    <div className="border-t pt-3">
+                      <Link
+                        href={`/function/tasks/detail?id=${encodeURIComponent(legacyTaskId)}`}
+                        className="inline-flex items-center gap-1 text-muted-foreground text-xs underline underline-offset-4"
+                      >
+                        이전 ARTEX 검토 작업 열기 <ArrowUpRightIcon className="size-3" />
+                      </Link>
+                      <p className="mt-1 text-muted-foreground text-xs">
+                        기존 작업 이력은 보존됩니다. 위 후보별 검토는 저장된 도구 근거에서 별도로 진행합니다.
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
