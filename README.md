@@ -20,6 +20,9 @@
 
 ![AegisLoop 통합 현황: Offensive·Defensive·Closed-loop를 연결하는 최신 웹 화면](docs/evidence/images/aegisloop-overview-2026-10-11.jpg)
 
+- v1.0 : aegisloop offensive + defensive + loop.
+- v1.1 : aegisloop offensive(API 진단 & 소스코드 진단 기능 추가) + defensive + loop.
+
 ### Offensive · 취약점 진단
 
 기존 ARTEX의 작업·자산·취약점·트래픽과 모델 사용 현황을 유지했습니다. **API · 소스 코드 진단**에서는 사용자 API 주소를 탐색하거나 OpenAPI 명세·HAR·소스 ZIP을 등록해 Schemathesis·Semgrep으로 후보·근거를 수집하고, 후보별 AI 판정을 저장하며 남은 후보를 이어서 검토할 수 있습니다. crAPI·Benchmark도 예제 대상으로 선택할 수 있습니다. 환경 준비와 웹 사용법은 [API · 소스 코드 진단 안내](docs/offensive-assessments.md)를 참고하세요. 아래는 별도 로컬 실습에서 저장한 진단 이력입니다.
